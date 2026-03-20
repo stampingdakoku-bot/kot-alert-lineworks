@@ -583,5 +583,46 @@ def store_delete(store_name):
     return redirect(url_for('stores'))
 
 
+# --- Settings ---
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    if request.method == 'POST':
+        updates = {
+            'clockin_alarm_enabled': 'clockin_alarm_enabled' in request.form,
+            'late_clockin_enabled': 'late_clockin_enabled' in request.form,
+            'late_clockin_start_minutes': int(request.form.get('late_clockin_start_minutes', 10)),
+            'late_clockin_interval_minutes': int(request.form.get('late_clockin_interval_minutes', 10)),
+            'late_clockin_max_count': int(request.form.get('late_clockin_max_count', 4)),
+            'clockout_alarm_enabled': 'clockout_alarm_enabled' in request.form,
+            'overtime_enabled': 'overtime_enabled' in request.form,
+            'overtime_start_minutes': int(request.form.get('overtime_start_minutes', 10)),
+            'overtime_interval_minutes': int(request.form.get('overtime_interval_minutes', 10)),
+            'overtime_max_count': int(request.form.get('overtime_max_count', 4)),
+            'deviation_enabled': 'deviation_enabled' in request.form,
+            'request_reminder_enabled': 'request_reminder_enabled' in request.form,
+            'request_reminder_interval_minutes': int(request.form.get('request_reminder_interval_minutes', 10)),
+            'request_reminder_max_count': int(request.form.get('request_reminder_max_count', 2)),
+            'admin_lw_id': request.form.get('admin_lw_id', '').strip(),
+            'daily_summary_enabled': 'daily_summary_enabled' in request.form,
+            'daily_summary_hour': int(request.form.get('daily_summary_hour', 23)),
+            'daily_summary_minute': int(request.form.get('daily_summary_minute', 0)),
+            'morning_check_enabled': 'morning_check_enabled' in request.form,
+            'morning_check_hour': int(request.form.get('morning_check_hour', 10)),
+            'morning_check_minute': int(request.form.get('morning_check_minute', 10)),
+            'updated_at': datetime.now(JST).isoformat(),
+        }
+        supabase.table('alert_settings').update(updates).eq('id', 1).execute()
+        flash('設定を保存しました', 'success')
+        return redirect(url_for('settings'))
+
+    try:
+        result = supabase.table('alert_settings').select('*').eq('id', 1).execute()
+        s = result.data[0] if result.data else {}
+    except Exception:
+        s = {}
+        flash('alert_settingsテーブルが見つかりません。Supabase SQL Editorでテーブルを作成してください。', 'error')
+    return render_template('settings.html', s=s)
+
+
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000, debug=True)

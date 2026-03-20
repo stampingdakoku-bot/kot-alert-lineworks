@@ -149,3 +149,34 @@ def get_store_calendars():
             'user_for_api': s['user_for_api'],
         }
     return stores
+
+
+def get_alert_settings():
+    """alert_settingsテーブルから設定を取得"""
+    result = supabase.table('alert_settings').select('*').eq('id', 1).execute()
+    if result.data:
+        return result.data[0]
+    # デフォルト値
+    return {
+        'clockin_alarm_enabled': True,
+        'late_clockin_enabled': True,
+        'late_clockin_start_minutes': 10,
+        'late_clockin_interval_minutes': 10,
+        'late_clockin_max_count': 4,
+        'clockout_alarm_enabled': True,
+        'overtime_enabled': True,
+        'overtime_start_minutes': 10,
+        'overtime_interval_minutes': 10,
+        'overtime_max_count': 4,
+        'deviation_enabled': True,
+        'request_reminder_enabled': True,
+        'request_reminder_interval_minutes': 10,
+        'request_reminder_max_count': 2,
+        'admin_lw_id': 'sakamoto.tatsuya@avivastarscorporation',
+        'daily_summary_enabled': True,
+        'daily_summary_hour': 23,
+        'daily_summary_minute': 0,
+        'morning_check_enabled': True,
+        'morning_check_hour': 10,
+        'morning_check_minute': 10,
+    }

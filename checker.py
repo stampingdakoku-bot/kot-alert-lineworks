@@ -208,6 +208,13 @@ def main():
     mappings_list = db.get_all_mappings()
     mappings = {m["employee_key"]: m["lw_account_id"] for m in mappings_list}
 
+    # アラート設定をDBから取得
+    settings = db.get_alert_settings()
+    MAX_LATE_CLOCKIN_ALERTS = settings.get('late_clockin_max_count', 4)
+    MAX_OVERTIME_ALERTS = settings.get('overtime_max_count', 4)
+    MAX_REQUEST_REMINDERS = settings.get('request_reminder_max_count', 2)
+    ADMIN_LW_ID = settings.get('admin_lw_id', 'sakamoto.tatsuya@avivastarscorporation')
+
     clockin_alarm_sent = 0
     clockout_alarm_sent = 0
     late_clockin_notified = 0
@@ -244,7 +251,7 @@ def main():
 
             # === 出勤アラーム ===
             # シフト開始時刻 〜 +10分の間（1回のみ）
-            if shift_start <= now < shift_start + timedelta(minutes=10):
+            if settings.get('clockin_alarm_enabled', True) and shift_start <= now < shift_start + timedelta(minutes=10):
                 if not db.was_alert_sent(emp_key, "clockin_alarm", today_str):
                     message = (
                         "🔔 出勤時間になりました（" + shift_start_str + "）\n\n"
@@ -258,7 +265,7 @@ def main():
 
             # === 退勤アラーム ===
             # シフト終了時刻 〜 +10分の間（1回のみ）
-            if shift_end <= now < shift_end + timedelta(minutes=10):
+            if settings.get('clockout_alarm_enabled', True) and shift_end <= now < shift_end + timedelta(minutes=10):
                 if not db.was_alert_sent(emp_key, "clockout_alarm", today_str):
                     message = (
                         "🔔 お疲れさまでした。\n\n"
@@ -309,7 +316,7 @@ def main():
             has_clock_out = tr.get("clock_out") is not None
 
             # === 出勤打刻なし検知（シフト開始+10分〜） ===
-            if now >= shift_start + timedelta(minutes=10) and not has_clock_in:
+            if settings.get('late_clockin_enabled', True) and now >= shift_start + timedelta(minutes=10) and not has_clock_in:
                 alert_count = db.count_alerts_today(emp_key, "late_clockin", today_str)
                 if alert_count < MAX_LATE_CLOCKIN_ALERTS:
                     round_num = alert_count + 1
@@ -337,7 +344,7 @@ def main():
             if now < shift_end + timedelta(minutes=10):
                 continue
 
-            if not has_clock_out:
+            if not has_clock_out and settings.get('overtime_enabled', True):
                 # === 超過警告 ===
                 alert_count = db.count_alerts_today(emp_key, "overtime", today_str)
                 if alert_count >= MAX_OVERTIME_ALERTS:
@@ -382,7 +389,7 @@ def main():
                     continue
 
                 # === 乖離通知 ===
-                if not db.was_alert_sent(emp_key, "deviation", today_str):
+                if settings.get('deviation_enabled', True) and not db.was_alert_sent(emp_key, "deviation", today_str):
                     message = (
                         "📋 退勤時刻にズレがあります\n\n"
                         + "シフト終了: " + shift_end_str + "\n"
@@ -397,7 +404,7 @@ def main():
                                     emp_code, emp_name, store_name, shift_end_str, clock_out_str)
 
                 # === 申請リマインド ===
-                elif db.was_alert_sent(emp_key, "deviation", today_str):
+                elif settings.get('request_reminder_enabled', True) and db.was_alert_sent(emp_key, "deviation", today_str):
                     reminder_count = db.count_alerts_today(emp_key, "request_reminder", today_str)
                     if reminder_count >= MAX_REQUEST_REMINDERS:
                         continue
@@ -424,15 +431,17 @@ def main():
     # ========================================
     # 23:00 速報（打刻ベースのみ、申請情報なし）
     # ========================================
-    if now.hour == 23:
-        send_nightly_report(today_str, all_emps)
+    if settings.get('daily_summary_enabled', True) and now.hour == settings.get('daily_summary_hour', 23):
+        send_nightly_report(today_str, all_emps, ADMIN_LW_ID)
 
     # ========================================
     # 10:10 翌朝申請漏れチェック（前日分）
     # ========================================
-    if now.hour == 10 and now.minute < 20:
+    mc_hour = settings.get('morning_check_hour', 10)
+    mc_min = settings.get('morning_check_minute', 10)
+    if settings.get('morning_check_enabled', True) and now.hour == mc_hour and mc_min <= now.minute < mc_min + 10:
         yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        send_morning_request_check(yesterday, all_emps)
+        send_morning_request_check(yesterday, all_emps, ADMIN_LW_ID)
 
     logger.info("=" * 50)
 
@@ -441,19 +450,14 @@ def main():
 ADMIN_LW_ID = "sakamoto.tatsuya@avivastarscorporation"
 
 
-def send_nightly_report(today_str, all_emps):
-    """23:00 速報: 打刻ベースの出退勤状況・乖離のみ"""
-    conn = db.get_conn()
-    rows = conn.execute(
-        "SELECT employee_key, flow_type FROM alerts_sent WHERE alert_date=?",
-        (today_str,)
-    ).fetchall()
-    conn.close()
+def send_nightly_report(today_str, all_emps, admin_lw_id=None):
+    """速報: 打刻ベースの出退勤状況・乖離のみ"""
+    result = db.supabase.table('alerts_sent').select('employee_key, flow_type').eq('alert_date', today_str).execute()
 
     # flow_type別に集計
     counts = {}
     problem_names = {}
-    for row in rows:
+    for row in result.data:
         ft = row["flow_type"]
         ek = row["employee_key"]
         counts[ft] = counts.get(ft, 0) + 1
@@ -493,40 +497,41 @@ def send_nightly_report(today_str, all_emps):
         lines.append("\n※申請状況は明朝チェックします。")
 
     message = "\n".join(lines)
-    if lw_api.send_message(ADMIN_LW_ID, message):
-        logger.info("23:00速報送信完了")
+    _admin = admin_lw_id or ADMIN_LW_ID
+    if lw_api.send_message(_admin, message):
+        logger.info("速報送信完了")
     else:
-        logger.error("23:00速報送信失敗")
+        logger.error("速報送信失敗")
 
 
-def send_morning_request_check(yesterday_str, all_emps):
-    """翌朝10:10: 前日のシフト超過者で申請未提出の人をチェック"""
+def send_morning_request_check(yesterday_str, all_emps, admin_lw_id=None):
+    """翌朝: 前日のシフト超過者で申請未提出の人をチェック"""
     # 既に送信済みならスキップ（1日1回）
-    conn = db.get_conn()
-    already = conn.execute(
-        "SELECT COUNT(*) as cnt FROM alerts_sent WHERE employee_key='__admin__' AND flow_type='morning_check' AND alert_date=?",
-        (yesterday_str,)
-    ).fetchone()
-    if already and already["cnt"] > 0:
-        conn.close()
+    already = db.supabase.table('alerts_sent').select('id', count='exact') \
+        .eq('employee_key', '__admin__').eq('flow_type', 'morning_check') \
+        .eq('alert_date', yesterday_str).execute()
+    if already.count and already.count > 0:
         logger.info("翌朝チェック: %s分は送信済み", yesterday_str)
         return
-    conn.close()
 
     # 前日に乖離通知を受けた人を取得
-    conn = db.get_conn()
-    deviation_rows = conn.execute(
-        "SELECT DISTINCT employee_key FROM alerts_sent WHERE alert_date=? AND flow_type='deviation'",
-        (yesterday_str,)
-    ).fetchall()
-    conn.close()
+    deviation_result = db.supabase.table('alerts_sent').select('employee_key') \
+        .eq('alert_date', yesterday_str).eq('flow_type', 'deviation').execute()
+    seen = set()
+    deviation_rows = []
+    for row in deviation_result.data:
+        ek = row['employee_key']
+        if ek not in seen:
+            seen.add(ek)
+            deviation_rows.append(row)
 
     if not deviation_rows:
         message = (
             "📋 前日の申請チェック（" + yesterday_str + "）\n\n"
             + "シフト超過者なし。申請チェック不要です。"
         )
-        lw_api.send_message(ADMIN_LW_ID, message)
+        _admin = admin_lw_id or ADMIN_LW_ID
+        lw_api.send_message(_admin, message)
         # 送信済み記録
         db.record_alert("__admin__", "morning_check", yesterday_str, "no_deviation")
         logger.info("翌朝チェック送信（超過者なし）")
@@ -556,7 +561,8 @@ def send_morning_request_check(yesterday_str, all_emps):
         lines.append("\n全員申請済みです。")
 
     message = "\n".join(lines)
-    if lw_api.send_message(ADMIN_LW_ID, message):
+    _admin = admin_lw_id or ADMIN_LW_ID
+    if lw_api.send_message(_admin, message):
         db.record_alert("__admin__", "morning_check", yesterday_str, message)
         logger.info("翌朝チェック送信完了（未申請: %d名, 申請済: %d名）", len(no_request), len(has_request))
     else:

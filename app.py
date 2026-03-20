@@ -147,15 +147,11 @@ def _get_store_shifts_and_attendance(today_str):
             comp = components[0]
             summary = comp.get("summary", "")
 
-            # Parse name from summary like "13-22 内田"
+            # Parse name from summary like "13-22 内田" / "11:00-21:00 内田"
             shift_name = None
-            m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
+            m = re.match(r'^\d{1,2}(?::\d{2})?\s*[\-〜~]\s*\d{1,2}(?::\d{2})?\s*(.+)$', summary.strip())
             if m:
                 shift_name = m.group(1).strip()
-            else:
-                m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
-                if m2:
-                    shift_name = m2.group(1).strip()
 
             if not shift_name:
                 continue
@@ -479,13 +475,9 @@ def shifts():
             summary = comp.get("summary", "")
 
             shift_name = None
-            m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
+            m = re.match(r'^\d{1,2}(?::\d{2})?\s*[\-〜~]\s*\d{1,2}(?::\d{2})?\s*(.+)$', summary.strip())
             if m:
                 shift_name = m.group(1).strip()
-            else:
-                m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
-                if m2:
-                    shift_name = m2.group(1).strip()
 
             if not shift_name:
                 continue

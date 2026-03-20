@@ -94,13 +94,16 @@ def _get_store_shifts_and_attendance(today_str):
         .order('employee_code') \
         .execute()
     emp_by_key = {}
-    name_map = {}
+    name_map = {}       # 名前 → 従業員（単一）
+    name_dups = {}      # 同姓 → [従業員リスト]
     for e in all_employees.data:
         emp_by_key[e['employee_key']] = e
         last_name = (e.get('last_name') or '').strip()
         first_name = (e.get('first_name') or '').strip()
-        if last_name and last_name not in name_map:
-            name_map[last_name] = e
+        if last_name:
+            name_dups.setdefault(last_name, []).append(e)
+            if last_name not in name_map:
+                name_map[last_name] = e
         # フルネーム（姓名）でもマッチできるように登録
         if last_name and first_name:
             full = last_name + first_name
@@ -197,7 +200,18 @@ def _get_store_shifts_and_attendance(today_str):
                 except (ValueError, TypeError):
                     pass
 
+            # 同姓が複数いる場合、KoTのdivisionNameで店舗に合致する従業員を選択
             emp = name_map.get(shift_name)
+            candidates = name_dups.get(shift_name, [])
+            if len(candidates) > 1:
+                store_name = store['store_name']
+                for c in candidates:
+                    ck = c['employee_key']
+                    if ck in timerecords:
+                        recs = timerecords[ck].get('records', [])
+                        if recs and store_name in recs[0].get('divisionName', ''):
+                            emp = c
+                            break
             emp_key = emp['employee_key'] if emp else None
             emp_code = emp.get('employee_code', '') if emp else ''
             full_name = shift_name

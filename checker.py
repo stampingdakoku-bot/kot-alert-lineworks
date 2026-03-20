@@ -80,30 +80,34 @@ def get_calendar_events(store_name, store_info, today_str, headers):
 
 
 def parse_shift_name(summary):
-    """カレンダーsummaryから名前を抽出: '13-22 内田' → '内田'"""
+    """カレンダーsummaryから名前を抽出: '13-22 内田' / '11:00-21:00 内田' → '内田'"""
     if not summary:
         return None
-    m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
+    m = re.match(r'^\d{1,2}(?::\d{2})?\s*[\-〜~]\s*\d{1,2}(?::\d{2})?\s*(.+)$', summary.strip())
     if m:
-        return m.group(1).strip()
-    m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
-    if m2:
-        name = m2.group(1).strip()
+        name = m.group(1).strip()
         if name:
             return name
     return None
 
 
 def build_name_to_employee_map(all_emps):
-    """姓 → employee情報のマッピング"""
+    """姓・姓名 → employee情報のマッピング"""
     name_map = {}
     for key, emp in all_emps.items():
         last_name = emp.get("last_name", "").strip()
+        first_name = emp.get("first_name", "").strip()
         if last_name and last_name not in name_map:
             name_map[last_name] = emp
             name_map[last_name]["employee_key"] = key
+        if last_name and first_name:
+            full = last_name + first_name
+            if full not in name_map:
+                name_map[full] = {**emp, "employee_key": key}
+            full_sp = last_name + " " + first_name
+            if full_sp not in name_map:
+                name_map[full_sp] = {**emp, "employee_key": key}
     return name_map
-
 
 def get_timerecord_requests(today_str):
     """KOTから当月の打刻修正申請データを取得し、当日分をemployeeKeyでまとめて返す"""

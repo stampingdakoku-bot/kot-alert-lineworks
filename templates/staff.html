@@ -16,9 +16,9 @@
                 <td>{{ emp.employee_code or '' }}</td>
                 <td>{{ emp.last_name or '' }} {{ emp.first_name or '' }}</td>
                 <td style="font-size:12px">{{ emp.employee_key[:16] }}...</td>
-                <td>{{ emp.mappings[0].lw_account_id if emp.mappings else '-' }}</td>
+                <td>{{ emp.mappings.lw_account_id if emp.mappings else '-' }}</td>
                 <td>
-                    <button class="btn btn-primary" onclick="openEdit('{{ emp.employee_key }}', '{{ emp.employee_code or '' }}', '{{ emp.last_name or '' }}', '{{ emp.first_name or '' }}', '{{ emp.mappings[0].lw_account_id if emp.mappings else '' }}')">編集</button>
+                    <button class="btn btn-primary" onclick="openEdit('{{ emp.employee_key }}', '{{ emp.employee_code or '' }}', '{{ emp.last_name or '' }}', '{{ emp.first_name or '' }}', '{{ emp.mappings.lw_account_id if emp.mappings else '' }}')">編集</button>
                     <form method="POST" action="/staff/{{ emp.employee_key }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
                         <button class="btn btn-danger">削除</button>
                     </form>

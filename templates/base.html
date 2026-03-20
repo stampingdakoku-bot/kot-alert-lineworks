@@ -48,6 +48,7 @@
         <a href="/staff" {% if '/staff' in request.path %}class="active"{% endif %}>スタッフ</a>
         <a href="/logs" {% if '/logs' in request.path %}class="active"{% endif %}>ログ</a>
         <a href="/stores" {% if '/stores' in request.path %}class="active"{% endif %}>店舗設定</a>
+        <a href="/logout" style="margin-left:auto">ログアウト</a>
     </nav>
     <div class="container">
         {% with messages = get_flashed_messages(with_categories=true) %}

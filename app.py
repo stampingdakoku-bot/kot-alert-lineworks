@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, date
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from dotenv import load_dotenv
 from supabase import create_client
 
@@ -9,10 +9,36 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev')
 
+ADMIN_PASSCODE = os.getenv('ADMIN_PASSCODE', '000000')
+
 supabase = create_client(
     os.getenv('SUPABASE_URL'),
     os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 )
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if request.form.get('passcode') == ADMIN_PASSCODE:
+            session['authenticated'] = True
+            return redirect(url_for('dashboard'))
+        flash('パスコードが正しくありません', 'error')
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.before_request
+def check_auth():
+    if request.endpoint in ('login', 'static'):
+        return
+    if not session.get('authenticated'):
+        return redirect(url_for('login'))
 
 
 # --- Dashboard ---
@@ -20,17 +46,22 @@ supabase = create_client(
 def dashboard():
     today = date.today().isoformat()
 
-    # Today's alert count by flow_type
-    alerts_today = supabase.table('alerts_sent')         .select('*')         .eq('alert_date', today)         .order('created_at', desc=True)         .execute()
+    alerts_today = supabase.table('alerts_sent') \
+        .select('*') \
+        .eq('alert_date', today) \
+        .order('created_at', desc=True) \
+        .execute()
 
-    # Summary by flow_type
     summary = {}
     for a in alerts_today.data:
         ft = a['flow_type']
         summary[ft] = summary.get(ft, 0) + 1
 
-    # Recent alerts (last 20)
-    recent = supabase.table('alerts_sent')         .select('*, employees(last_name, first_name)')         .order('created_at', desc=True)         .limit(20)         .execute()
+    recent = supabase.table('alerts_sent') \
+        .select('*, employees(last_name, first_name)') \
+        .order('created_at', desc=True) \
+        .limit(20) \
+        .execute()
 
     return render_template('dashboard.html',
                            today=today,
@@ -42,7 +73,10 @@ def dashboard():
 # --- Staff ---
 @app.route('/staff')
 def staff_list():
-    employees = supabase.table('employees')         .select('*, mappings(lw_account_id)')         .order('employee_code')         .execute()
+    employees = supabase.table('employees') \
+        .select('*, mappings(lw_account_id)') \
+        .order('employee_code') \
+        .execute()
     return render_template('staff.html', employees=employees.data)
 
 
@@ -98,9 +132,10 @@ def staff_delete(employee_key):
 # --- Logs ---
 @app.route('/logs')
 def logs():
-    query = supabase.table('alerts_sent')         .select('*, employees(last_name, first_name)')         .order('created_at', desc=True)
+    query = supabase.table('alerts_sent') \
+        .select('*, employees(last_name, first_name)') \
+        .order('created_at', desc=True)
 
-    # Filters
     flow_type = request.args.get('flow_type', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
@@ -130,7 +165,10 @@ def logs():
 # --- Stores ---
 @app.route('/stores')
 def stores():
-    result = supabase.table('store_calendars')         .select('*')         .order('store_name')         .execute()
+    result = supabase.table('store_calendars') \
+        .select('*') \
+        .order('store_name') \
+        .execute()
     return render_template('stores.html', stores=result.data)
 
 

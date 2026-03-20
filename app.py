@@ -18,6 +18,27 @@ supabase = create_client(
 
 JST = timezone(timedelta(hours=9))
 
+def _parse_iso(s):
+    """Python 3.10互換のISO 8601パーサー（非標準マイクロ秒桁数に対応）"""
+    import re
+    # 小数秒を6桁に正規化 (.3657 → .365700, .75 → .750000 等)
+    s = re.sub(r'(\.\d+)', lambda m: (m.group(1)[:7].ljust(7, '0')), s)
+    return datetime.fromisoformat(s)
+
+@app.template_filter('to_jst')
+def to_jst_filter(s):
+    """UTC日時文字列をJST表示用に変換 (例: '03/20 16:00')"""
+    if not s:
+        return ''
+    try:
+        dt = _parse_iso(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt_jst = dt.astimezone(JST)
+        return dt_jst.strftime('%m/%d %H:%M')
+    except (ValueError, TypeError):
+        return s[5:16].replace('-', '/').replace('T', ' ')
+
 FLOW_LABELS = {
     'clockin_alarm': '出勤アラーム',
     'clockout_alarm': '退勤アラーム',
@@ -166,7 +187,11 @@ def _get_store_shifts_and_attendance(today_str):
             if start_dt_str and end_dt_str:
                 try:
                     s = datetime.fromisoformat(start_dt_str)
+                    if s.tzinfo is None:
+                        s = s.replace(tzinfo=JST)
                     e = datetime.fromisoformat(end_dt_str)
+                    if e.tzinfo is None:
+                        e = e.replace(tzinfo=JST)
                     shift_time = f"{s.hour}:{s.minute:02d}-{e.hour}:{e.minute:02d}"
                     shift_start_dt = s
                 except (ValueError, TypeError):
@@ -492,6 +517,8 @@ def shifts():
             if start_dt_str:
                 try:
                     s = datetime.fromisoformat(start_dt_str)
+                    if s.tzinfo is None:
+                        s = s.replace(tzinfo=JST)
                     start_time = f"{s.hour}:{s.minute:02d}"
                     event_date = s.strftime("%Y-%m-%d")
                 except (ValueError, TypeError):
@@ -499,6 +526,8 @@ def shifts():
             if end_dt_str:
                 try:
                     e = datetime.fromisoformat(end_dt_str)
+                    if e.tzinfo is None:
+                        e = e.replace(tzinfo=JST)
                     end_time = f"{e.hour}:{e.minute:02d}"
                 except (ValueError, TypeError):
                     pass

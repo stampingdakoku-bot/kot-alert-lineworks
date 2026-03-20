@@ -146,7 +146,7 @@
             <tbody>
                 {% for log in recent %}
                 <tr>
-                    <td style="white-space:nowrap;font-size:12px">{{ log.created_at[5:16].replace('-', '/').replace('T', ' ') if log.created_at else '' }}</td>
+                    <td style="white-space:nowrap;font-size:12px">{{ log.created_at|to_jst }}</td>
                     <td style="font-size:13px">{{ log.employees.last_name if log.employees else '' }}</td>
                     <td>
                         {% set ft = log.flow_type %}

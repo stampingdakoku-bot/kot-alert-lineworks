@@ -1,13 +1,23 @@
 {% extends 'base.html' %}
 {% block title %}アラートログ{% endblock %}
 {% block content %}
+{% set flow_labels = {
+    'clockin_alarm': '出勤アラーム',
+    'clockout_alarm': '退勤アラーム',
+    'late_clockin': '出勤打刻なし',
+    'overtime': '超過警告',
+    'deviation': '乖離通知',
+    'request_reminder': '申請リマインド',
+    'morning_check': '翌朝チェック'
+} %}
+
 <div class="card">
     <h2>アラートログ</h2>
     <form class="form-row" style="margin-bottom:16px">
         <select name="flow_type">
             <option value="">全種別</option>
             {% for ft in flow_types %}
-            <option value="{{ ft }}" {% if filter_flow == ft %}selected{% endif %}>{{ ft }}</option>
+            <option value="{{ ft }}" {% if filter_flow == ft %}selected{% endif %}>{{ flow_labels.get(ft, ft) }}</option>
             {% endfor %}
         </select>
         <input type="date" name="date_from" value="{{ filter_from }}" placeholder="開始日">
@@ -18,15 +28,15 @@
     </form>
     <table>
         <thead>
-            <tr><th>日付</th><th>スタッフ</th><th>種別</th><th>メッセージ</th></tr>
+            <tr><th style="width:90px">日付</th><th style="width:100px">スタッフ</th><th style="width:120px">種別</th><th>メッセージ</th></tr>
         </thead>
         <tbody>
             {% for log in logs %}
             <tr>
-                <td>{{ log.alert_date }}</td>
+                <td style="white-space:nowrap">{{ log.alert_date[5:].replace('-', '/') if log.alert_date else '' }}</td>
                 <td>{{ log.employees.last_name if log.employees else '' }} {{ log.employees.first_name if log.employees else '' }}</td>
-                <td>{{ log.flow_type }}</td>
-                <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ log.message or '' }}</td>
+                <td>{{ flow_labels.get(log.flow_type, log.flow_type) }}</td>
+                <td style="white-space:pre-wrap;word-break:break-all;font-size:13px">{{ log.message or '' }}</td>
             </tr>
             {% endfor %}
             {% if not logs %}

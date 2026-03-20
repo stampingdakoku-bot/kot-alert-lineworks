@@ -1,7 +1,17 @@
 {% extends 'base.html' %}
 {% block title %}ダッシュボード{% endblock %}
 {% block content %}
-<h2 style="margin-bottom:16px">ダッシュボード - {{ today }}</h2>
+{% set flow_labels = {
+    'clockin_alarm': '出勤アラーム',
+    'clockout_alarm': '退勤アラーム',
+    'late_clockin': '出勤打刻なし',
+    'overtime': '超過警告',
+    'deviation': '乖離通知',
+    'request_reminder': '申請リマインド',
+    'morning_check': '翌朝チェック'
+} %}
+
+<h2 style="margin-bottom:16px">ダッシュボード - {{ today[5:].replace('-', '/') }}</h2>
 
 <div class="stats">
     <div class="stat">
@@ -11,7 +21,7 @@
     {% for ft, count in summary.items() %}
     <div class="stat">
         <div class="num">{{ count }}</div>
-        <div class="label">{{ ft }}</div>
+        <div class="label">{{ flow_labels.get(ft, ft) }}</div>
     </div>
     {% endfor %}
 </div>
@@ -20,15 +30,15 @@
     <h2>最近の通知</h2>
     <table>
         <thead>
-            <tr><th>日時</th><th>スタッフ</th><th>種別</th><th>メッセージ</th></tr>
+            <tr><th style="width:100px">日時</th><th style="width:100px">スタッフ</th><th style="width:120px">種別</th><th>メッセージ</th></tr>
         </thead>
         <tbody>
             {% for log in recent %}
             <tr>
-                <td>{{ log.created_at[:16] if log.created_at else '' }}</td>
+                <td style="white-space:nowrap">{{ log.created_at[5:16].replace('-', '/').replace('T', ' ') if log.created_at else '' }}</td>
                 <td>{{ log.employees.last_name if log.employees else '' }} {{ log.employees.first_name if log.employees else '' }}</td>
-                <td>{{ log.flow_type }}</td>
-                <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ log.message or '' }}</td>
+                <td>{{ flow_labels.get(log.flow_type, log.flow_type) }}</td>
+                <td style="white-space:pre-wrap;word-break:break-all;font-size:13px">{{ log.message or '' }}</td>
             </tr>
             {% endfor %}
             {% if not recent %}

@@ -1,151 +1,112 @@
-# KoT Alert - LINE WORKS 打刻アラートシステム
+# KoT Alert LINE WORKS System
 
 ## システム概要
+KoT（King of Time）の打刻データをもとに、LINE WORKSでスタッフへ
+出退勤アラートを自動送信するシステム。
 
-KoT（King of Time）の打刻データとLINE WORKSカレンダーのシフト情報を照合し、
-打刻漏れ・超過勤務・申請漏れをLINE WORKSメッセージで自動通知するシステム。
+## アカウント情報
+- 管理Googleアカウント: Stamping.dakoku@gmail.com
+- GitHub: stampingdakoku-bot/kot-alert-lineworks
+- Supabase: aujxtiyvdywabtnkvswm.supabase.co（東京リージョン）
 
-- **運用VPS**: 133.125.93.39（さくらVPS 石狩第1ゾーン / Ubuntu 22.04）
-- **旧VPS**: 49.212.220.117（cron停止済み、trecole-priceのみ稼働）
-- **DB**: Supabase（東京リージョン）`aujxtiyvdywabtnkvswm.supabase.co`
-- **GitHub**: `stampingdakoku-bot/kot-alert-lineworks`（プライベート）
-- **管理アカウント**: Stamping.dakoku@gmail.com
-- **管理画面**: `http://133.125.93.39/`（パスコード認証）
+## サーバー情報
+- 本番VPS: ubuntu@133.125.93.39（さくらVPS 石狩第1ゾーン 1Core-1GB）
+- OS: Ubuntu 22.04
+- 月額: 1,980円
 
 ## アーキテクチャ
+- Nginx（:80）→ Gunicorn（:5000）→ Flask（app.py）
+- checker.py が cron で10分ごとに実行
+- DBはSupabase（PostgreSQL）
 
+## ディレクトリ構成
 ```
-[cron 10分間隔] → checker.py → KoT API (打刻取得)
-                              → LINE WORKS API (カレンダー取得 + メッセージ送信)
-                              → Supabase (従業員/マッピング/ログ/店舗設定)
-
-[ブラウザ] → Nginx:80 → Gunicorn:5000 → app.py (Flask管理画面)
-                                        → Supabase (CRUD)
-```
-
-## ファイル構成
-
-| ファイル | 説明 |
-|---------|------|
-| `checker.py` | v3.0 メインチェッカー（定刻アラーム＋打刻検知＋申請確認＋速報＋翌朝チェック） |
-| `db_supabase.py` | Supabase DB操作層（全テーブルのCRUD） |
-| `config.py` | 設定（シークレットは全て.envから読み込み） |
-| `app.py` | Flask管理画面（パスコード認証付き） |
-| `kot_api.py` | King of Time API連携 |
-| `lw_api.py` | LINE WORKS API連携（JWT認証＋メッセージ送信） |
-| `mapping.py` | KoT↔LWマッピングユーティリティ |
-| `templates/` | Jinja2テンプレート（login, dashboard, staff, logs, stores） |
-| `private_key.pem` | LINE WORKS サービスアカウント秘密鍵（git管理外） |
-| `.env` | 全シークレット（git管理外） |
-
-## Supabaseテーブル
-
-| テーブル | 用途 |
-|---------|------|
-| `employees` | 従業員マスタ（KoTから同期、27名） |
-| `mappings` | employee_key → lw_account_id マッピング（20件） |
-| `alerts_sent` | 通知送信ログ（flow_type別） |
-| `store_calendars` | 店舗カレンダー設定（4店舗） |
-| `reminder_tracking` | リマインド追跡 |
-
-## checker.py 通知フロー
-
-### 出勤側（例: 13:00開始）
-| 時刻 | flow_type | 内容 |
-|------|-----------|------|
-| 13:00 | `clockin_alarm` | 出勤アラーム（全員1回） |
-| 13:10〜 | `late_clockin` | 出勤打刻なし検知（10分刻み、最大4回） |
-
-### 退勤側（例: 22:00終了）
-| 時刻 | flow_type | 内容 |
-|------|-----------|------|
-| 22:00 | `clockout_alarm` | 退勤アラーム（全員1回） |
-| 22:10〜 | `overtime` | 超過警告（10分刻み、最大4回） |
-| 退勤打刻後 | `deviation` | 乖離通知（シフト終了と退勤打刻のズレ） |
-| 乖離通知後 | `request_reminder` | 申請リマインド（最大2回） |
-
-### 定期レポート
-| 時刻 | flow_type | 内容 |
-|------|-----------|------|
-| 23:00 | — | 管理者へ本日の速報 |
-| 翌10:10 | `morning_check` | 前日の申請漏れチェック |
-
-管理者LW ID: `sakamoto.tatsuya@avivastarscorporation`
-
-## 店舗設定（store_calendars）
-
-| 店舗 | 閉店 | カレンダーAPI用ユーザー |
-|------|------|----------------------|
-| 山口 | 22:00 | wa9127@avivastarscorporation |
-| 楽々園 | 21:00 | av.75304@avivastarscorporation |
-| 周南久米 | 22:00 | av.56572@avivastarscorporation |
-| フジグラン | 21:00 | av.26103@avivastarscorporation |
-
-## cron設定
-
-```
-0,10,20,30,40,50 10-22 * * * cd /home/ubuntu/kot-alert-lineworks && /home/ubuntu/kot-alert-lineworks/venv/bin/python3 checker.py >> logs/cron.log 2>&1
-0 23 * * * cd /home/ubuntu/kot-alert-lineworks && /home/ubuntu/kot-alert-lineworks/venv/bin/python3 checker.py >> logs/cron.log 2>&1
-```
-
-## .env 必要な環境変数
-
-```
-SUPABASE_URL=https://aujxtiyvdywabtnkvswm.supabase.co
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-FLASK_SECRET_KEY=...
-ADMIN_PASSCODE=...
-KOT_TOKEN=...
-LW_CLIENT_ID=...
-LW_CLIENT_SECRET=...
-LW_SERVICE_ACCOUNT_ID=vwm4y.serviceaccount@avivastarscorporation
-LW_BOT_ID=11845418
-LW_PRIVATE_KEY_PATH=/home/ubuntu/kot-alert-lineworks/private_key.pem
-LW_DOMAIN_ID=400183322
-```
-
-## サービス管理
-
-```bash
-# Flask管理画面
-sudo systemctl status kot-alert
-sudo systemctl restart kot-alert
-sudo journalctl -u kot-alert -n 50 --no-pager
-
-# checker.pyログ
-tail -50 ~/kot-alert-lineworks/logs/cron.log
-tail -50 ~/kot-alert-lineworks/logs/alert.log
-
-# checker.py手動実行
-cd ~/kot-alert-lineworks && venv/bin/python3 checker.py
-
-# Nginx
-sudo systemctl status nginx
-sudo nginx -t && sudo systemctl reload nginx
+/home/ubuntu/kot-alert-lineworks/
+├── checker.py      # メインチェッカー v3.0
+├── db_supabase.py  # Supabase DB操作
+├── app.py          # Flask管理画面
+├── config.py       # 設定（シークレットは.env）
+├── kot_api.py      # KoT WebAPI クライアント
+├── lw_api.py       # LINE WORKS Bot APIクライアント
+├── mapping.py      # マッピング管理CLI
+├── requirements.txt
+├── .env            # 秘密情報（gitignore）
+├── private_key.pem # LINE WORKS JWT署名用（gitignore）
+└── templates/      # Flask HTMLテンプレート
 ```
 
 ## 管理画面
+- URL: http://133.125.93.39/
+- パスコード: .envのADMIN_PASSCODE参照
+- 機能: ダッシュボード/スタッフ管理/アラートログ/店舗設定
 
-- URL: `http://133.125.93.39/`
-- 認証: パスコード（.env ADMIN_PASSCODE）
-- `/` — ダッシュボード（本日の通知サマリー、最近の通知）
-- `/staff` — スタッフ一覧・マッピング管理（追加・編集・削除）
-- `/logs` — アラートログ検索（種別・日付フィルタ）
-- `/stores` — 店舗カレンダー設定
+## 通知フロー
 
-## 2026-03-20 構築作業ログ
+出勤側（例: 13:00開始）
+- 13:00 出勤アラーム（全員）
+- 13:10〜 打刻なし検知（最大4回）
 
-1. 新VPS初期セットアップ（Ubuntu 22.04、nginx、Python3）
-2. GitHub SSH鍵登録、リポジトリclone
-3. Python仮想環境作成、依存パッケージインストール
-4. Supabaseテーブル作成（employees, mappings, alerts_sent, store_calendars, reminder_tracking）
-5. 既存VPSのSQLiteデータ → Supabase移行（employees 27名、mappings 20件）
-6. db_supabase.py 作成（SQLite → Supabase置換）
-7. checker.py v3.0（STORE_CALENDARSハードコード廃止、DB関数統一）
-8. config.py シークレットを.env化
-9. Flask管理画面作成（ダッシュボード、スタッフ、ログ、店舗設定）
-10. パスコード認証追加
-11. Nginx + Gunicorn + systemd設定
-12. 既存VPSのcron停止、新VPSにcron移設
-13. GitHubにpush
+退勤側（例: 22:00終了）
+- 22:00 退勤アラーム（全員）
+- 22:10〜 超過警告（最大4回）
+- 退勤後: 乖離通知 → 申請リマインド（最大2回）
+
+管理者サマリー
+- 23:00 速報（坂本達也宛）
+- 翌10:10 申請漏れチェック
+
+## cron設定
+```
+0,10,20,30,40,50 10-22 * * * cd /home/ubuntu/kot-alert-lineworks && /usr/bin/python3 checker.py >> logs/cron.log 2>&1
+0 23 * * * cd /home/ubuntu/kot-alert-lineworks && /usr/bin/python3 checker.py >> logs/cron.log 2>&1
+```
+
+## KoT API
+- ベースURL: https://api.kingtime.jp/v1.0
+- 禁止時間帯: 8:30-10:00, 17:30-18:30（JST）
+- 許可IP: 133.125.93.39を登録済み
+
+## LINE WORKS Bot
+- Bot ID: 11845418
+- Domain ID: 400183322
+- Service Account: vwm4y.serviceaccount@avivastarscorporation
+- Bot名: 勤怠アラート
+
+## 店舗カレンダー（Supabaseのstore_calendarsテーブルで管理）
+- 山口: 22時閉店
+- 楽々園: 21時閉店
+- 周南久米: 22時閉店
+- フジグラン: 21時閉店
+
+## 運用コマンド
+```bash
+# SSH接続
+ssh ubuntu@133.125.93.39
+
+# サービス操作
+sudo systemctl restart kot-alert
+sudo systemctl status kot-alert
+
+# ログ確認
+sudo journalctl -u kot-alert -n 50 --no-pager
+tail -f /home/ubuntu/kot-alert-lineworks/logs/cron.log
+
+# 手動実行
+cd /home/ubuntu/kot-alert-lineworks
+python3 checker.py
+
+# 今日の通知レコードクリア（誤通知時）
+# Supabase SQL Editor で:
+# DELETE FROM alerts_sent WHERE alert_date = 'YYYY-MM-DD';
+```
+
+## 注意事項
+- HTTPのみ（HTTPS未設定、ドメイン取得後に対応予定）
+- mappingsが空のスタッフはLINE WORKS通知されない
+- KoT API禁止時間帯はphase2（打刻チェック）がスキップされる
+- private_key.pemは再発行済み（2026/3/18）
+
+## 積み残し
+- HTTPS対応（ドメイン取得後）
+- マネフォビジネス給与API連携検討中
+- KoT overtimes API未検証

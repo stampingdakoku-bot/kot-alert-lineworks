@@ -45,6 +45,7 @@
     <nav>
         <a href="/" class="brand">KoT Alert</a>
         <a href="/" {% if request.path == '/' %}class="active"{% endif %}>ダッシュボード</a>
+        <a href="/shifts" {% if '/shifts' in request.path %}class="active"{% endif %}>シフト一覧</a>
         <a href="/staff" {% if '/staff' in request.path %}class="active"{% endif %}>スタッフ</a>
         <a href="/logs" {% if '/logs' in request.path %}class="active"{% endif %}>ログ</a>
         <a href="/stores" {% if '/stores' in request.path %}class="active"{% endif %}>店舗設定</a>

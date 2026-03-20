@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}シフト一覧{% endblock %}
+{% block content %}
+
+<h2 style="margin-bottom:16px">シフト一覧 — {{ today[5:].replace('-', '/') }} から7日間</h2>
+
+{# ===== 店舗タブ ===== #}
+<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #ddd">
+    {% for store in store_shifts %}
+    <a href="?store={{ store.store_name }}"
+       style="padding:10px 20px;text-decoration:none;font-size:14px;font-weight:600;
+              border-bottom:3px solid {{ '#3498db' if store.store_name == active_store else 'transparent' }};
+              color:{{ '#3498db' if store.store_name == active_store else '#666' }};
+              margin-bottom:-2px">
+        {{ store.store_name }}
+        <span style="font-size:11px;color:#999;font-weight:normal">〜{{ store.closing_hour }}:00</span>
+    </a>
+    {% endfor %}
+</div>
+
+{# ===== シフト表示 ===== #}
+{% for store in store_shifts %}
+{% if store.store_name == active_store %}
+<div class="card" style="padding:0;overflow:hidden">
+    <div style="overflow-x:auto">
+        <table style="margin-bottom:0">
+            <thead>
+                <tr>
+                    <th style="width:140px;position:sticky;left:0;background:#f8f9fa;z-index:1">日付</th>
+                    <th>スタッフ / シフト</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for day in store.days %}
+                <tr style="{{ 'background:#eaf4fd' if day.is_today else '' }}">
+                    <td style="position:sticky;left:0;z-index:1;white-space:nowrap;font-weight:600;
+                               {{ 'background:#eaf4fd' if day.is_today else 'background:white' }}">
+                        <div style="font-size:14px">
+                            {{ day.date[5:].replace('-', '/') }}
+                            <span style="font-size:12px;margin-left:2px;
+                                         color:{{ '#e74c3c' if day.weekday == '日' else '#3498db' if day.weekday == '土' else '#333' }}">
+                                ({{ day.weekday }})
+                            </span>
+                        </div>
+                        {% if day.is_today %}
+                        <span style="font-size:10px;background:#3498db;color:white;padding:1px 6px;border-radius:3px">TODAY</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if day.shifts %}
+                        <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">
+                            {% for shift in day.shifts %}
+                            <div style="display:inline-flex;align-items:center;gap:6px;background:#f8f9fa;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid #eee">
+                                <span style="font-weight:600">{{ shift.name }}</span>
+                                <span style="color:#666;font-size:12px">{{ shift.start }}〜{{ shift.end }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <span style="color:#bbb;font-size:13px">シフトなし</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endfor %}
+
+{% if not store_shifts %}
+<div class="card" style="text-align:center;color:#999;padding:40px">
+    店舗が登録されていません
+</div>
+{% endif %}
+
+{% endblock %}

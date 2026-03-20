@@ -1,6 +1,6 @@
 import os
-from datetime import datetime, date
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from datetime import datetime, date, timezone, timedelta
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from dotenv import load_dotenv
 from supabase import create_client
 
@@ -15,6 +15,8 @@ supabase = create_client(
     os.getenv('SUPABASE_URL'),
     os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 )
+
+JST = timezone(timedelta(hours=9))
 
 FLOW_LABELS = {
     'clockin_alarm': '出勤アラーム',
@@ -51,6 +53,153 @@ def check_auth():
         return redirect(url_for('login'))
 
 
+def _get_store_shifts_and_attendance(today_str):
+    """店舗ごとのシフト情報と出退勤状況を取得"""
+    import re
+    import kot_api
+    import lw_api
+    import requests as req_lib
+
+    stores_result = supabase.table('store_calendars') \
+        .select('*') \
+        .eq('is_active', True) \
+        .order('store_name') \
+        .execute()
+    stores = stores_result.data
+
+    # 従業員マスタ
+    all_employees = supabase.table('employees') \
+        .select('*, mappings(lw_account_id)') \
+        .order('employee_code') \
+        .execute()
+    emp_by_key = {}
+    name_map = {}
+    for e in all_employees.data:
+        emp_by_key[e['employee_key']] = e
+        last_name = (e.get('last_name') or '').strip()
+        if last_name and last_name not in name_map:
+            name_map[last_name] = e
+
+    # LINE WORKS token for calendar API
+    token = lw_api.get_access_token()
+    headers = {"Authorization": "Bearer " + token} if token else {}
+
+    # KoT timerecords
+    timerecords = {}
+    if not kot_api.is_api_blocked():
+        raw = kot_api.get_timerecords(today_str)
+        timerecords = kot_api.parse_timerecords_for_employee(raw)
+
+    store_cards = []
+    for store in stores:
+        card = {
+            'store_name': store['store_name'],
+            'closing_hour': store['closing_hour'],
+            'staff_scheduled': [],
+            'staff_clocked_in': [],
+            'staff_not_clocked': [],
+            'calendar_error': False,
+            'kot_blocked': kot_api.is_api_blocked(),
+        }
+
+        if not token:
+            card['calendar_error'] = True
+            store_cards.append(card)
+            continue
+
+        # Fetch calendar events
+        uid = store.get('user_for_api', '')
+        cid = store.get('calendar_id', '')
+        from_dt = today_str + "T00:00:00+09:00"
+        until_dt = today_str + "T23:59:59+09:00"
+        url = (
+            "https://www.worksapis.com/v1.0/users/" + uid
+            + "/calendars/" + cid
+            + "/events?fromDateTime=" + from_dt.replace("+", "%2B")
+            + "&untilDateTime=" + until_dt.replace("+", "%2B")
+            + "&count=100"
+        )
+
+        events = []
+        try:
+            r = req_lib.get(url, headers=headers, timeout=15)
+            if r.status_code == 200:
+                events = r.json().get("events", [])
+            else:
+                card['calendar_error'] = True
+        except Exception:
+            card['calendar_error'] = True
+
+        # Parse shift names from events
+        for event in events:
+            components = event.get("eventComponents", [])
+            if not components:
+                continue
+            comp = components[0]
+            summary = comp.get("summary", "")
+
+            # Parse name from summary like "13-22 内田"
+            shift_name = None
+            m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
+            if m:
+                shift_name = m.group(1).strip()
+            else:
+                m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
+                if m2:
+                    shift_name = m2.group(1).strip()
+
+            if not shift_name:
+                continue
+
+            # Parse shift times
+            start_info = comp.get("start", {})
+            end_info = comp.get("end", {})
+            start_dt_str = start_info.get("dateTime", "")
+            end_dt_str = end_info.get("dateTime", "")
+            shift_time = ""
+            if start_dt_str and end_dt_str:
+                try:
+                    s = datetime.fromisoformat(start_dt_str)
+                    e = datetime.fromisoformat(end_dt_str)
+                    shift_time = f"{s.hour}:{s.minute:02d}-{e.hour}:{e.minute:02d}"
+                except (ValueError, TypeError):
+                    pass
+
+            emp = name_map.get(shift_name)
+            emp_key = emp['employee_key'] if emp else None
+            emp_code = emp.get('employee_code', '') if emp else ''
+            full_name = shift_name
+
+            staff_info = {
+                'name': full_name,
+                'code': emp_code,
+                'shift_time': shift_time,
+                'emp_key': emp_key,
+            }
+
+            card['staff_scheduled'].append(staff_info)
+
+            # Check attendance from KoT
+            if emp_key and emp_key in timerecords:
+                tr = timerecords[emp_key]
+                if tr.get('clock_in'):
+                    clock_in_str = tr['clock_in'].strftime('%H:%M')
+                    clock_out_str = tr['clock_out'].strftime('%H:%M') if tr.get('clock_out') else None
+                    card['staff_clocked_in'].append({
+                        **staff_info,
+                        'clock_in': clock_in_str,
+                        'clock_out': clock_out_str,
+                    })
+                else:
+                    card['staff_not_clocked'].append(staff_info)
+            elif emp_key:
+                card['staff_not_clocked'].append(staff_info)
+
+        store_cards.append(card)
+
+    return store_cards, all_employees.data
+
+
 # --- Dashboard ---
 @app.route('/')
 def dashboard():
@@ -79,12 +228,19 @@ def dashboard():
         .limit(20) \
         .execute()
 
-    # Unmapped staff count
-    all_employees = supabase.table('employees') \
-        .select('employee_key, employee_code, last_name, first_name, mappings(lw_account_id)') \
-        .order('employee_code') \
-        .execute()
-    unmapped = [e for e in all_employees.data if not e.get('mappings')]
+    # Store cards with shift/attendance data
+    try:
+        store_cards, all_emp_data = _get_store_shifts_and_attendance(today)
+    except Exception as e:
+        store_cards = []
+        all_emp_data = supabase.table('employees') \
+            .select('*, mappings(lw_account_id)') \
+            .order('employee_code') \
+            .execute().data
+
+    # Unmapped staff count (exclude is_excluded=true)
+    unmapped = [e for e in all_emp_data
+                if not e.get('mappings') and not e.get('is_excluded')]
     unmapped_count = len(unmapped)
 
     # Problem staff: late_clockin and overtime today
@@ -106,13 +262,6 @@ def dashboard():
                 problem_overtime[key] = {'name': name, 'code': code, 'count': 0}
             problem_overtime[key]['count'] += 1
 
-    # Store calendars
-    stores = supabase.table('store_calendars') \
-        .select('store_name, closing_hour, is_active') \
-        .eq('is_active', True) \
-        .order('store_name') \
-        .execute()
-
     return render_template('dashboard.html',
                            today=today,
                            summary=summary,
@@ -122,7 +271,7 @@ def dashboard():
                            unmapped_names=unmapped[:5],
                            problem_late=list(problem_late.values()),
                            problem_overtime=list(problem_overtime.values()),
-                           stores=stores.data,
+                           store_cards=store_cards,
                            flow_labels=FLOW_LABELS)
 
 
@@ -185,6 +334,24 @@ def staff_delete(employee_key):
     return redirect(url_for('staff_list'))
 
 
+@app.route('/staff/<employee_key>/toggle_exclude', methods=['POST'])
+def staff_toggle_exclude(employee_key):
+    # Get current state
+    result = supabase.table('employees') \
+        .select('is_excluded') \
+        .eq('employee_key', employee_key) \
+        .limit(1) \
+        .execute()
+    if result.data:
+        current = result.data[0].get('is_excluded', False)
+        supabase.table('employees').update({
+            'is_excluded': not current
+        }).eq('employee_key', employee_key).execute()
+        status = '除外しました' if not current else '除外を解除しました'
+        flash(status, 'success')
+    return redirect(url_for('staff_list'))
+
+
 # --- Logs ---
 @app.route('/logs')
 def logs():
@@ -216,6 +383,133 @@ def logs():
                            filter_flow=flow_type,
                            filter_from=date_from,
                            filter_to=date_to)
+
+
+# --- Shifts ---
+@app.route('/shifts')
+def shifts():
+    import re
+    import lw_api
+    import requests as req_lib
+
+    stores_result = supabase.table('store_calendars') \
+        .select('*') \
+        .eq('is_active', True) \
+        .order('store_name') \
+        .execute()
+    stores = stores_result.data
+
+    # Build name map from employees
+    all_employees = supabase.table('employees') \
+        .select('employee_key, employee_code, last_name, first_name') \
+        .order('employee_code') \
+        .execute()
+    name_map = {}
+    for e in all_employees.data:
+        last_name = (e.get('last_name') or '').strip()
+        if last_name and last_name not in name_map:
+            name_map[last_name] = e
+
+    token = lw_api.get_access_token()
+    headers = {"Authorization": "Bearer " + token} if token else {}
+
+    today = date.today()
+    dates = [(today + timedelta(days=i)) for i in range(7)]
+    today_str = today.isoformat()
+
+    store_shifts = []
+    for store in stores:
+        uid = store.get('user_for_api', '')
+        cid = store.get('calendar_id', '')
+        days = []
+
+        for d in dates:
+            d_str = d.isoformat()
+            day_shifts = []
+
+            if token and uid and cid:
+                from_dt = d_str + "T00:00:00+09:00"
+                until_dt = d_str + "T23:59:59+09:00"
+                url = (
+                    "https://www.worksapis.com/v1.0/users/" + uid
+                    + "/calendars/" + cid
+                    + "/events?fromDateTime=" + from_dt.replace("+", "%2B")
+                    + "&untilDateTime=" + until_dt.replace("+", "%2B")
+                    + "&count=100"
+                )
+                try:
+                    r = req_lib.get(url, headers=headers, timeout=15)
+                    if r.status_code == 200:
+                        events = r.json().get("events", [])
+                        for event in events:
+                            components = event.get("eventComponents", [])
+                            if not components:
+                                continue
+                            comp = components[0]
+                            summary = comp.get("summary", "")
+
+                            shift_name = None
+                            m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
+                            if m:
+                                shift_name = m.group(1).strip()
+                            else:
+                                m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
+                                if m2:
+                                    shift_name = m2.group(1).strip()
+
+                            if not shift_name:
+                                continue
+
+                            start_info = comp.get("start", {})
+                            end_info = comp.get("end", {})
+                            start_dt_str = start_info.get("dateTime", "")
+                            end_dt_str = end_info.get("dateTime", "")
+                            start_time = ""
+                            end_time = ""
+                            if start_dt_str:
+                                try:
+                                    s = datetime.fromisoformat(start_dt_str)
+                                    start_time = f"{s.hour}:{s.minute:02d}"
+                                except (ValueError, TypeError):
+                                    pass
+                            if end_dt_str:
+                                try:
+                                    e = datetime.fromisoformat(end_dt_str)
+                                    end_time = f"{e.hour}:{e.minute:02d}"
+                                except (ValueError, TypeError):
+                                    pass
+
+                            day_shifts.append({
+                                'name': shift_name,
+                                'start': start_time,
+                                'end': end_time,
+                            })
+                except Exception:
+                    pass
+
+            # Sort by start time
+            day_shifts.sort(key=lambda x: x['start'])
+
+            days.append({
+                'date': d_str,
+                'weekday': ['月', '火', '水', '木', '金', '土', '日'][d.weekday()],
+                'is_today': d == today,
+                'shifts': day_shifts,
+            })
+
+        store_shifts.append({
+            'store_name': store['store_name'],
+            'closing_hour': store['closing_hour'],
+            'days': days,
+        })
+
+    # Default to first store tab
+    active_store = request.args.get('store', stores[0]['store_name'] if stores else '')
+
+    return render_template('shifts.html',
+                           store_shifts=store_shifts,
+                           active_store=active_store,
+                           today=today_str)
 
 
 # --- Stores ---

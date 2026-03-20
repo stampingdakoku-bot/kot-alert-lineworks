@@ -196,7 +196,10 @@ def _get_store_shifts_and_attendance(today_str):
                     if e.tzinfo is None:
                         e = e.replace(tzinfo=JST)
                     shift_time = f"{s.hour}:{s.minute:02d}-{e.hour}:{e.minute:02d}"
-                    shift_start_dt = s
+                    # 繰り返しイベントは過去日付が返るため、今日の日付+時刻で再構築
+                    today_date = date.fromisoformat(today_str)
+                    shift_start_dt = datetime(today_date.year, today_date.month, today_date.day,
+                                              s.hour, s.minute, 0, tzinfo=JST)
                 except (ValueError, TypeError):
                     pass
 

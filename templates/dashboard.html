@@ -16,78 +16,155 @@
 
 <h2 style="margin-bottom:16px">ダッシュボード — {{ today[5:].replace('-', '/') }}</h2>
 
-{# ===== メインエリア 2カラム ===== #}
+{# ===== 店舗カード 2x2グリッド ===== #}
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-
-    {# --- 左カラム: 本日の状況 --- #}
-    <div>
-        {# 店舗情報 #}
-        <div class="card">
-            <h2>稼働店舗</h2>
-            <table>
-                <thead><tr><th>店舗</th><th>閉店</th><th>状態</th></tr></thead>
-                <tbody>
-                    {% for s in stores %}
-                    <tr>
-                        <td>{{ s.store_name }}</td>
-                        <td>{{ s.closing_hour }}:00</td>
-                        <td><span class="badge badge-active">稼働中</span></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% for card in store_cards %}
+    <div class="card" style="padding:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h2 style="margin:0;font-size:18px">{{ card.store_name }}</h2>
+            <span style="font-size:13px;color:#666">閉店 {{ card.closing_hour }}:00</span>
         </div>
 
-        {# 通知サマリー #}
-        <div class="card">
-            <h2>本日の通知サマリー</h2>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                <div style="background:#f8f9fa;border-radius:6px;padding:16px;text-align:center">
-                    <div style="font-size:32px;font-weight:bold;color:#3498db">{{ total_today }}</div>
-                    <div style="font-size:12px;color:#999">通知総数</div>
-                </div>
-                {% set active_types = ['clockin_alarm', 'clockout_alarm', 'late_clockin', 'overtime', 'deviation', 'request_reminder'] %}
-                {% for ft in active_types %}
-                {% set count = summary.get(ft, 0) %}
-                {% set is_problem = ft in ('late_clockin', 'overtime', 'deviation') and count > 0 %}
-                <div style="background:{{ '#fdf0f0' if is_problem else '#f8f9fa' }};border-radius:6px;padding:12px;text-align:center;{{ 'border:1px solid #e74c3c' if is_problem else '' }}">
-                    <div style="font-size:24px;font-weight:bold;color:{{ '#e74c3c' if is_problem else '#333' }}">{{ count }}</div>
-                    <div style="font-size:11px;color:#666">{{ flow_labels.get(ft, ft) }}</div>
-                </div>
+        {% if card.calendar_error %}
+        <div style="background:#fff3cd;color:#856404;padding:8px 12px;border-radius:4px;font-size:13px;margin-bottom:8px">
+            カレンダー取得に失敗しました
+        </div>
+        {% endif %}
+
+        {% if card.kot_blocked %}
+        <div style="background:#e2e3e5;color:#383d41;padding:6px 10px;border-radius:4px;font-size:12px;margin-bottom:8px">
+            KoT APIメンテナンス時間帯（打刻情報は取得不可）
+        </div>
+        {% endif %}
+
+        {% if card.staff_scheduled %}
+        <div style="font-size:12px;color:#999;margin-bottom:6px">
+            本日の出勤予定: {{ card.staff_scheduled|length }}名
+        </div>
+        <table style="margin-bottom:0">
+            <thead>
+                <tr>
+                    <th style="width:30px"></th>
+                    <th>スタッフ</th>
+                    <th>シフト</th>
+                    <th>打刻状況</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for staff in card.staff_scheduled %}
+                {% set is_in = staff.emp_key and staff.emp_key in (card.staff_clocked_in | map(attribute='emp_key') | list) %}
+                {% set clocked = None %}
+                {% for c in card.staff_clocked_in %}
+                    {% if c.emp_key == staff.emp_key %}
+                        {% set clocked = c %}
+                    {% endif %}
                 {% endfor %}
+                {% set is_not_clocked = staff.emp_key and staff.emp_key in (card.staff_not_clocked | map(attribute='emp_key') | list) %}
+                <tr>
+                    <td style="text-align:center;font-size:16px">
+                        {% if is_in %}
+                            <span style="color:#27ae60" title="出勤済">●</span>
+                        {% elif is_not_clocked %}
+                            <span style="color:#e74c3c" title="未打刻">●</span>
+                        {% elif card.kot_blocked %}
+                            <span style="color:#95a5a6" title="確認不可">●</span>
+                        {% elif staff.before_shift %}
+                            <span style="color:#95a5a6" title="出勤前">○</span>
+                        {% else %}
+                            <span style="color:#95a5a6">●</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:14px">{{ staff.name }}</td>
+                    <td style="font-size:13px;color:#666">{{ staff.shift_time }}</td>
+                    <td style="font-size:12px">
+                        {% if is_in %}
+                            {% for c in card.staff_clocked_in %}
+                                {% if c.emp_key == staff.emp_key %}
+                                    <span style="color:#27ae60">出勤 {{ c.clock_in }}</span>
+                                    {% if c.clock_out %}
+                                        <span style="color:#3498db;margin-left:4px">退勤 {{ c.clock_out }}</span>
+                                    {% endif %}
+                                {% endif %}
+                            {% endfor %}
+                        {% elif is_not_clocked %}
+                            <span style="color:#e74c3c">未打刻</span>
+                        {% elif card.kot_blocked %}
+                            <span style="color:#95a5a6">—</span>
+                        {% elif staff.before_shift %}
+                            <span style="color:#95a5a6">—</span>
+                        {% else %}
+                            <span style="color:#95a5a6">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="text-align:center;color:#999;padding:24px 0;font-size:14px">
+            本日のシフトはありません
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if not store_cards %}
+    <div class="card" style="grid-column:1/-1;text-align:center;color:#999;padding:40px">
+        店舗情報を取得できませんでした
+    </div>
+    {% endif %}
+</div>
+
+{# ===== 通知サマリー + 最近の通知 ===== #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+    {# --- 左: 通知サマリー --- #}
+    <div class="card">
+        <h2>本日の通知サマリー</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:#f8f9fa;border-radius:6px;padding:16px;text-align:center">
+                <div style="font-size:32px;font-weight:bold;color:#3498db">{{ total_today }}</div>
+                <div style="font-size:12px;color:#999">通知総数</div>
             </div>
+            {% set active_types = ['clockin_alarm', 'clockout_alarm', 'late_clockin', 'overtime', 'deviation', 'request_reminder'] %}
+            {% for ft in active_types %}
+            {% set count = summary.get(ft, 0) %}
+            {% set is_problem = ft in ('late_clockin', 'overtime', 'deviation') and count > 0 %}
+            <div style="background:{{ '#fdf0f0' if is_problem else '#f8f9fa' }};border-radius:6px;padding:12px;text-align:center;{{ 'border:1px solid #e74c3c' if is_problem else '' }}">
+                <div style="font-size:24px;font-weight:bold;color:{{ '#e74c3c' if is_problem else '#333' }}">{{ count }}</div>
+                <div style="font-size:11px;color:#666">{{ flow_labels.get(ft, ft) }}</div>
+            </div>
+            {% endfor %}
         </div>
     </div>
 
-    {# --- 右カラム: 最近の通知 --- #}
-    <div>
-        <div class="card" style="max-height:600px;overflow-y:auto">
-            <h2>最近の通知</h2>
-            <table>
-                <thead><tr><th style="width:80px">日時</th><th style="width:80px">スタッフ</th><th style="width:100px">種別</th><th>メッセージ</th></tr></thead>
-                <tbody>
-                    {% for log in recent %}
-                    <tr>
-                        <td style="white-space:nowrap;font-size:12px">{{ log.created_at[5:16].replace('-', '/').replace('T', ' ') if log.created_at else '' }}</td>
-                        <td style="font-size:13px">{{ log.employees.last_name if log.employees else '' }}</td>
-                        <td>
-                            {% set ft = log.flow_type %}
-                            {% set is_warn = ft in ('late_clockin', 'overtime', 'deviation') %}
-                            <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white">{{ flow_labels.get(ft, ft) }}</span>
-                        </td>
-                        <td style="white-space:pre-wrap;word-break:break-all;font-size:12px;color:#555">{{ log.message or '' }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% if not recent %}
-                    <tr><td colspan="4" style="text-align:center;color:#999;padding:24px">通知はまだありません</td></tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+    {# --- 右: 最近の通知 --- #}
+    <div class="card" style="max-height:400px;overflow-y:auto">
+        <h2>最近の通知</h2>
+        <table>
+            <thead><tr><th style="width:80px">日時</th><th style="width:80px">スタッフ</th><th style="width:100px">種別</th><th>メッセージ</th></tr></thead>
+            <tbody>
+                {% for log in recent %}
+                <tr>
+                    <td style="white-space:nowrap;font-size:12px">{{ log.created_at[5:16].replace('-', '/').replace('T', ' ') if log.created_at else '' }}</td>
+                    <td style="font-size:13px">{{ log.employees.last_name if log.employees else '' }}</td>
+                    <td>
+                        {% set ft = log.flow_type %}
+                        {% set is_warn = ft in ('late_clockin', 'overtime', 'deviation') %}
+                        <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white">{{ flow_labels.get(ft, ft) }}</span>
+                    </td>
+                    <td style="white-space:pre-wrap;word-break:break-all;font-size:12px;color:#555">{{ log.message or '' }}</td>
+                </tr>
+                {% endfor %}
+                {% if not recent %}
+                <tr><td colspan="4" style="text-align:center;color:#999;padding:24px">通知はまだありません</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
     </div>
 </div>
 
-{# ===== 下部: 注意が必要なスタッフ ===== #}
+{# ===== 注意が必要なスタッフ ===== #}
 {% if problem_late or problem_overtime %}
 <div class="card">
     <h2 style="color:#e74c3c">注意が必要なスタッフ</h2>

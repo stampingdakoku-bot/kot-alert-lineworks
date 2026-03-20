@@ -157,11 +157,13 @@ def _get_store_shifts_and_attendance(today_str):
             start_dt_str = start_info.get("dateTime", "")
             end_dt_str = end_info.get("dateTime", "")
             shift_time = ""
+            shift_start_dt = None
             if start_dt_str and end_dt_str:
                 try:
                     s = datetime.fromisoformat(start_dt_str)
                     e = datetime.fromisoformat(end_dt_str)
                     shift_time = f"{s.hour}:{s.minute:02d}-{e.hour}:{e.minute:02d}"
+                    shift_start_dt = s
                 except (ValueError, TypeError):
                     pass
 
@@ -170,11 +172,15 @@ def _get_store_shifts_and_attendance(today_str):
             emp_code = emp.get('employee_code', '') if emp else ''
             full_name = shift_name
 
+            now = datetime.now(JST)
+            before_shift = shift_start_dt and now < shift_start_dt
+
             staff_info = {
                 'name': full_name,
                 'code': emp_code,
                 'shift_time': shift_time,
                 'emp_key': emp_key,
+                'before_shift': before_shift,
             }
 
             card['staff_scheduled'].append(staff_info)
@@ -190,9 +196,9 @@ def _get_store_shifts_and_attendance(today_str):
                         'clock_in': clock_in_str,
                         'clock_out': clock_out_str,
                     })
-                else:
+                elif not before_shift:
                     card['staff_not_clocked'].append(staff_info)
-            elif emp_key:
+            elif emp_key and not before_shift:
                 card['staff_not_clocked'].append(staff_info)
 
         store_cards.append(card)

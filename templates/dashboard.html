@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}ダッシュボード{% endblock %}
+{% block content %}
+<h2 style="margin-bottom:16px">ダッシュボード - {{ today }}</h2>
+
+<div class="stats">
+    <div class="stat">
+        <div class="num">{{ total_today }}</div>
+        <div class="label">本日の通知数</div>
+    </div>
+    {% for ft, count in summary.items() %}
+    <div class="stat">
+        <div class="num">{{ count }}</div>
+        <div class="label">{{ ft }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="card">
+    <h2>最近の通知</h2>
+    <table>
+        <thead>
+            <tr><th>日時</th><th>スタッフ</th><th>種別</th><th>メッセージ</th></tr>
+        </thead>
+        <tbody>
+            {% for log in recent %}
+            <tr>
+                <td>{{ log.created_at[:16] if log.created_at else '' }}</td>
+                <td>{{ log.employees.last_name if log.employees else '' }} {{ log.employees.first_name if log.employees else '' }}</td>
+                <td>{{ log.flow_type }}</td>
+                <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ log.message or '' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not recent %}
+            <tr><td colspan="4" style="text-align:center;color:#999">通知はまだありません</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

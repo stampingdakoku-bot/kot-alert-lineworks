@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}店舗設定{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>店舗カレンダー設定</h2>
+    <div style="margin-bottom:16px">
+        <button class="btn btn-primary" onclick="document.getElementById('addStoreModal').style.display='block'">+ 店舗追加</button>
+    </div>
+    <table>
+        <thead>
+            <tr><th>店舗名</th><th>カレンダーID</th><th>API用ユーザー</th><th>閉店時刻</th><th>状態</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+            {% for s in stores %}
+            <tr>
+                <td>{{ s.store_name }}</td>
+                <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis">{{ s.calendar_id }}</td>
+                <td style="font-size:12px">{{ s.user_for_api }}</td>
+                <td>{{ s.closing_hour }}:00</td>
+                <td><span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ '有効' if s.is_active else '無効' }}</span></td>
+                <td>
+                    <button class="btn btn-primary" onclick="openStoreEdit('{{ s.store_name }}', '{{ s.calendar_id }}', '{{ s.user_for_api }}', {{ s.closing_hour }}, {{ 'true' if s.is_active else 'false' }})">編集</button>
+                    <form method="POST" action="/stores/{{ s.store_name }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
+                        <button class="btn btn-danger">削除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Store Modal -->
+<div id="addStoreModal" class="modal-bg" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal">
+        <h3>店舗追加</h3>
+        <form method="POST" action="/stores/add">
+            <div class="form-row"><label>店舗名</label><input name="store_name" required style="flex:1"></div>
+            <div class="form-row"><label>カレンダーID</label><input name="calendar_id" required style="flex:1"></div>
+            <div class="form-row"><label>API用ユーザー</label><input name="user_for_api" required style="flex:1"></div>
+            <div class="form-row"><label>閉店時刻</label><input name="closing_hour" type="number" min="0" max="23" required style="width:80px"></div>
+            <div style="margin-top:16px;text-align:right">
+                <button type="button" class="btn" onclick="this.closest('.modal-bg').style.display='none'">キャンセル</button>
+                <button type="submit" class="btn btn-success">追加</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Store Modal -->
+<div id="editStoreModal" class="modal-bg" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal">
+        <h3>店舗編集</h3>
+        <form method="POST" action="/stores/edit">
+            <input type="hidden" name="store_name" id="es_name">
+            <div class="form-row"><label>店舗名</label><input id="es_name_display" disabled style="flex:1"></div>
+            <div class="form-row"><label>カレンダーID</label><input name="calendar_id" id="es_cal" required style="flex:1"></div>
+            <div class="form-row"><label>API用ユーザー</label><input name="user_for_api" id="es_user" required style="flex:1"></div>
+            <div class="form-row"><label>閉店時刻</label><input name="closing_hour" id="es_hour" type="number" min="0" max="23" required style="width:80px"></div>
+            <div class="form-row"><label>有効</label><input type="checkbox" name="is_active" id="es_active"></div>
+            <div style="margin-top:16px;text-align:right">
+                <button type="button" class="btn" onclick="this.closest('.modal-bg').style.display='none'">キャンセル</button>
+                <button type="submit" class="btn btn-success">更新</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openStoreEdit(name, cal, user, hour, active) {
+    document.getElementById('es_name').value = name;
+    document.getElementById('es_name_display').value = name;
+    document.getElementById('es_cal').value = cal;
+    document.getElementById('es_user').value = user;
+    document.getElementById('es_hour').value = hour;
+    document.getElementById('es_active').checked = active;
+    document.getElementById('editStoreModal').style.display = 'block';
+}
+</script>
+{% endblock %}

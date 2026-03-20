@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}アラートログ{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>アラートログ</h2>
+    <form class="form-row" style="margin-bottom:16px">
+        <select name="flow_type">
+            <option value="">全種別</option>
+            {% for ft in flow_types %}
+            <option value="{{ ft }}" {% if filter_flow == ft %}selected{% endif %}>{{ ft }}</option>
+            {% endfor %}
+        </select>
+        <input type="date" name="date_from" value="{{ filter_from }}" placeholder="開始日">
+        <span>〜</span>
+        <input type="date" name="date_to" value="{{ filter_to }}" placeholder="終了日">
+        <button class="btn btn-primary">検索</button>
+        <a href="/logs" class="btn">リセット</a>
+    </form>
+    <table>
+        <thead>
+            <tr><th>日付</th><th>スタッフ</th><th>種別</th><th>メッセージ</th></tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.alert_date }}</td>
+                <td>{{ log.employees.last_name if log.employees else '' }} {{ log.employees.first_name if log.employees else '' }}</td>
+                <td>{{ log.flow_type }}</td>
+                <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ log.message or '' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not logs %}
+            <tr><td colspan="4" style="text-align:center;color:#999">ログがありません</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

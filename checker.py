@@ -1,0 +1,567 @@
+"""
+kot-alert v2.3: 定刻アラーム＋打刻検知＋申請確認
+
+フロー（出勤側 例: 13:00開始）:
+  13:00  出勤アラーム（全員に1回）「出勤時間になりました。打刻をお願いします。」
+  13:10  出勤打刻なし検知1回目
+  13:20  出勤打刻なし検知2回目
+  13:30〜 10分刻みで継続（最大4回）
+
+フロー（退勤側 例: 22:00終了）:
+  22:00  退勤アラーム（全員に1回）「お疲れさまでした。退勤時間になりました。」
+  22:10  超過警告1回目
+  22:20  超過警告2回目
+  22:30〜 10分刻みで継続（最大4回）
+  退勤打刻後: 乖離通知 → 申請リマインド（最大2回）
+
+cron（毎時00分含む10分間隔 10:00〜23:00）:
+  0,10,20,30,40,50 10-22 * * * cd /home/ubuntu/kot-alert && /usr/bin/python3 checker.py >> logs/cron.log 2>&1
+  0 23 * * * cd /home/ubuntu/kot-alert && /usr/bin/python3 checker.py >> logs/cron.log 2>&1
+"""
+import sys
+import os
+import re
+import logging
+from datetime import datetime, timezone, timedelta
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from config import LOG_PATH, LW_DOMAIN_ID
+import db_supabase as db
+import kot_api
+import lw_api
+import requests
+
+# --- ロギング設定 ---
+os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_PATH, encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("checker")
+
+JST = timezone(timedelta(hours=9))
+
+# 店舗別カレンダー設定（Supabaseから取得）
+
+MAX_OVERTIME_ALERTS = 4
+MAX_LATE_CLOCKIN_ALERTS = 4
+MAX_REQUEST_REMINDERS = 2
+
+
+
+def get_calendar_events(store_name, store_info, today_str, headers):
+    """店舗カレンダーからシフトイベントを取得"""
+    uid = store_info["user_for_api"]
+    cid = store_info["calendar_id"]
+    from_dt = today_str + "T00:00:00+09:00"
+    until_dt = today_str + "T23:59:59+09:00"
+    url = (
+        "https://www.worksapis.com/v1.0/users/" + uid
+        + "/calendars/" + cid
+        + "/events?fromDateTime=" + from_dt.replace("+", "%2B")
+        + "&untilDateTime=" + until_dt.replace("+", "%2B")
+        + "&count=100"
+    )
+    try:
+        r = requests.get(url, headers=headers, timeout=30)
+        if r.status_code == 200:
+            return r.json().get("events", [])
+        else:
+            logger.warning("カレンダー取得失敗 %s: %d %s", store_name, r.status_code, r.text[:200])
+            return []
+    except Exception as e:
+        logger.error("カレンダーAPI例外 %s: %s", store_name, str(e))
+        return []
+
+
+def parse_shift_name(summary):
+    """カレンダーsummaryから名前を抽出: '13-22 内田' → '内田'"""
+    if not summary:
+        return None
+    m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
+    if m:
+        return m.group(1).strip()
+    m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
+    if m2:
+        name = m2.group(1).strip()
+        if name:
+            return name
+    return None
+
+
+def build_name_to_employee_map(all_emps):
+    """姓 → employee情報のマッピング"""
+    name_map = {}
+    for key, emp in all_emps.items():
+        last_name = emp.get("last_name", "").strip()
+        if last_name and last_name not in name_map:
+            name_map[last_name] = emp
+            name_map[last_name]["employee_key"] = key
+    return name_map
+
+
+def get_timerecord_requests(today_str):
+    """KOTから当月の打刻修正申請データを取得し、当日分をemployeeKeyでまとめて返す"""
+    year_month = today_str[:7]
+    try:
+        data = kot_api._get("/requests/timerecords/" + year_month)
+        if not data:
+            return {}
+    except Exception as e:
+        logger.warning("打刻修正申請取得失敗: %s", str(e))
+        return {}
+
+    result = {}
+    for req in data.get("requests", []):
+        if req.get("date") == today_str:
+            emp_key = req.get("employeeKey", "")
+            status = req.get("status", "")
+            if emp_key not in result:
+                result[emp_key] = []
+            result[emp_key].append(status)
+    return result
+
+
+def has_request_for_today(employee_key, timerecord_requests):
+    """当日の打刻修正申請があるか"""
+    statuses = timerecord_requests.get(employee_key, [])
+    for s in statuses:
+        if s in ("approved", "pending", "applying", "approvalProcess"):
+            return True
+    return False
+
+
+def parse_shift_events(events, now, name_map, mappings):
+    """カレンダーイベントをパースしてシフト情報リストを返す"""
+    shifts = []
+    for event in events:
+        components = event.get("eventComponents", [])
+        if not components:
+            continue
+        comp = components[0]
+        summary = comp.get("summary", "")
+        shift_name = parse_shift_name(summary)
+        if not shift_name:
+            continue
+
+        start_info = comp.get("start", {})
+        start_dt_str = start_info.get("dateTime", "")
+        end_info = comp.get("end", {})
+        end_dt_str = end_info.get("dateTime", "")
+        if not start_dt_str or not end_dt_str:
+            continue
+
+        start_parsed = datetime.fromisoformat(start_dt_str)
+        shift_start = now.replace(hour=start_parsed.hour, minute=start_parsed.minute, second=0, microsecond=0)
+        end_parsed = datetime.fromisoformat(end_dt_str)
+        shift_end = now.replace(hour=end_parsed.hour, minute=end_parsed.minute, second=0, microsecond=0)
+
+        emp_info = name_map.get(shift_name)
+        if not emp_info:
+            continue
+
+        emp_key = emp_info["employee_key"]
+        lw_id = mappings.get(emp_key)
+        if not lw_id:
+            continue
+
+        shifts.append({
+            "shift_name": shift_name,
+            "shift_start": shift_start,
+            "shift_end": shift_end,
+            "emp_key": emp_key,
+            "emp_code": emp_info.get("employee_code", ""),
+            "emp_name": emp_info.get("last_name", "") + " " + emp_info.get("first_name", ""),
+            "lw_id": lw_id,
+        })
+    return shifts
+
+
+def main():
+    now = datetime.now(JST)
+    today_str = now.strftime("%Y-%m-%d")
+
+    logger.info("=" * 50)
+    logger.info("kot-alert チェッカー開始 (v3.0 Supabase版)")
+    logger.info("現在時刻: %s", now.strftime("%H:%M"))
+    logger.info("対象日: %s", today_str)
+
+    # LINE WORKS アクセストークン取得
+    lw_api._token_cache["access_token"] = None
+    lw_api._token_cache["expires_at"] = 0
+    token = lw_api.get_access_token()
+    if not token:
+        logger.error("LINE WORKSトークン取得失敗")
+        return
+    headers = {"Authorization": "Bearer " + token}
+
+    # 従業員マスタ
+    all_emps = {e["employee_key"]: e for e in db.get_all_employees()}
+    name_map = build_name_to_employee_map(all_emps)
+
+    # マッピング（employee_key → lw_account_id）
+    mappings_list = db.get_all_mappings()
+    mappings = {m["employee_key"]: m["lw_account_id"] for m in mappings_list}
+
+    clockin_alarm_sent = 0
+    clockout_alarm_sent = 0
+    late_clockin_notified = 0
+    overtime_notified = 0
+    deviation_notified = 0
+    reminder_notified = 0
+    matched = 0
+
+    # 店舗カレンダー設定をSupabaseから取得
+    STORE_CALENDARS = db.get_store_calendars()
+    logger.info("店舗設定: %d店舗", len(STORE_CALENDARS))
+
+    # カレンダーイベントを一括取得（APIコール節約）
+    all_store_shifts = {}
+    for store_name, store_info in STORE_CALENDARS.items():
+        events = get_calendar_events(store_name, store_info, today_str, headers)
+        logger.info("%s: %d件のシフト", store_name, len(events))
+        all_store_shifts[store_name] = parse_shift_events(events, now, name_map, mappings)
+
+    # ========================================
+    # フェーズ1: 定刻アラーム（KOTデータ不要）
+    # ========================================
+    for store_name, shifts in all_store_shifts.items():
+        for s in shifts:
+            matched += 1
+            shift_start = s["shift_start"]
+            shift_end = s["shift_end"]
+            emp_key = s["emp_key"]
+            emp_code = s["emp_code"]
+            emp_name = s["emp_name"]
+            lw_id = s["lw_id"]
+            shift_start_str = shift_start.strftime("%H:%M")
+            shift_end_str = shift_end.strftime("%H:%M")
+
+            # === 出勤アラーム ===
+            # シフト開始時刻 〜 +10分の間（1回のみ）
+            if shift_start <= now < shift_start + timedelta(minutes=10):
+                if not db.was_alert_sent(emp_key, "clockin_alarm", today_str):
+                    message = (
+                        "🔔 出勤時間になりました（" + shift_start_str + "）\n\n"
+                        + "打刻をお願いします。"
+                    )
+                    if lw_api.send_message(lw_id, message):
+                        db.record_alert(emp_key, "clockin_alarm", today_str, message)
+                        clockin_alarm_sent += 1
+                        logger.info("出勤アラーム: %s %s (%s, %s)",
+                                    emp_code, emp_name, store_name, shift_start_str)
+
+            # === 退勤アラーム ===
+            # シフト終了時刻 〜 +10分の間（1回のみ）
+            if shift_end <= now < shift_end + timedelta(minutes=10):
+                if not db.was_alert_sent(emp_key, "clockout_alarm", today_str):
+                    message = (
+                        "🔔 お疲れさまでした。\n\n"
+                        + "退勤時間になりました（" + shift_end_str + "）\n"
+                        + "打刻して速やかにお帰りください。"
+                    )
+                    if lw_api.send_message(lw_id, message):
+                        db.record_alert(emp_key, "clockout_alarm", today_str, message)
+                        clockout_alarm_sent += 1
+                        logger.info("退勤アラーム: %s %s (%s, %s)",
+                                    emp_code, emp_name, store_name, shift_end_str)
+
+    # ========================================
+    # フェーズ2: 打刻チェック（KOTデータ必要）
+    # ========================================
+    if kot_api.is_api_blocked():
+        logger.info("KOT API利用禁止時間帯のため打刻チェックスキップ")
+        logger.info("出勤アラーム: %d名, 退勤アラーム: %d名",
+                    clockin_alarm_sent, clockout_alarm_sent)
+        logger.info("=" * 50)
+        return
+
+    # KOT打刻データ取得
+    raw_timerecords = kot_api.get_timerecords(today_str)
+    timerecords = kot_api.parse_timerecords_for_employee(raw_timerecords)
+    logger.info("打刻データ: %d件", len(timerecords))
+
+    # KOT申請データ取得（当日分）
+    tr_requests = get_timerecord_requests(today_str)
+    logger.info("当日申請データ: %d名", len(tr_requests))
+
+    checked = 0
+
+    for store_name, shifts in all_store_shifts.items():
+        for s in shifts:
+            shift_start = s["shift_start"]
+            shift_end = s["shift_end"]
+            emp_key = s["emp_key"]
+            emp_code = s["emp_code"]
+            emp_name = s["emp_name"]
+            lw_id = s["lw_id"]
+            shift_start_str = shift_start.strftime("%H:%M")
+            shift_end_str = shift_end.strftime("%H:%M")
+
+            # KOT打刻データ確認
+            tr = timerecords.get(emp_key, {})
+            has_clock_in = tr.get("clock_in") is not None
+            has_clock_out = tr.get("clock_out") is not None
+
+            # === 出勤打刻なし検知（シフト開始+10分〜） ===
+            if now >= shift_start + timedelta(minutes=10) and not has_clock_in:
+                alert_count = db.count_alerts_today(emp_key, "late_clockin", today_str)
+                if alert_count < MAX_LATE_CLOCKIN_ALERTS:
+                    round_num = alert_count + 1
+                    message = (
+                        "🕐 出勤打刻の確認（" + str(round_num) + "回目）\n\n"
+                        + "シフト開始時刻（" + shift_start_str + "）を過ぎましたが、"
+                        + "出勤打刻が確認できません。\n\n"
+                        + "打刻漏れはないですか？\n"
+                        + "確認をお願いします。"
+                    )
+                    if lw_api.send_message(lw_id, message):
+                        db.record_alert(emp_key, "late_clockin", today_str, message)
+                        late_clockin_notified += 1
+                        logger.info("出勤打刻なし(%d回目): %s %s (%s, シフト開始%s)",
+                                    round_num, emp_code, emp_name, store_name, shift_start_str)
+                continue  # 出勤打刻なしなら退勤チェック不要
+
+            # 出勤打刻なし（シフト開始前 or +10分前）→ スキップ
+            if not has_clock_in:
+                continue
+
+            checked += 1
+
+            # === 退勤チェック（シフト終了+10分を過ぎている場合のみ） ===
+            if now < shift_end + timedelta(minutes=10):
+                continue
+
+            if not has_clock_out:
+                # === 超過警告 ===
+                alert_count = db.count_alerts_today(emp_key, "overtime", today_str)
+                if alert_count >= MAX_OVERTIME_ALERTS:
+                    logger.debug("%s %s: 超過警告上限到達", emp_code, emp_name)
+                    continue
+
+                round_num = alert_count + 1
+                message = (
+                    "⚠️ 勤務超過のお知らせ（" + str(round_num) + "回目）\n\n"
+                    + "シフト終了時刻（" + shift_end_str + "）を過ぎましたが、"
+                    + "退勤打刻が確認できません。\n\n"
+                    + "退勤打刻をお忘れではないですか？\n"
+                    + "残業の場合も、退勤後に打刻をお願いします。"
+                )
+
+                if lw_api.send_message(lw_id, message):
+                    db.record_alert(emp_key, "overtime", today_str, message)
+                    overtime_notified += 1
+                    logger.info("超過警告(%d回目): %s %s (%s, シフト終了%s)",
+                                round_num, emp_code, emp_name, store_name, shift_end_str)
+
+            else:
+                # === 退勤打刻あり ===
+                overtime_count = db.count_alerts_today(emp_key, "overtime", today_str)
+                if overtime_count == 0:
+                    continue
+
+                diff_minutes = int((tr["clock_out"] - shift_end).total_seconds() / 60)
+                clock_out_str = tr["clock_out"].strftime("%H:%M")
+
+                if abs(diff_minutes) <= 1:
+                    continue
+
+                if diff_minutes > 0:
+                    diff_str = str(diff_minutes) + "分超過"
+                else:
+                    diff_str = str(abs(diff_minutes)) + "分早退"
+
+                # 申請済みチェック
+                if has_request_for_today(emp_key, tr_requests):
+                    logger.info("%s %s: 申請済み、通知スキップ", emp_code, emp_name)
+                    continue
+
+                # === 乖離通知 ===
+                if not db.was_alert_sent(emp_key, "deviation", today_str):
+                    message = (
+                        "📋 退勤時刻にズレがあります\n\n"
+                        + "シフト終了: " + shift_end_str + "\n"
+                        + "退勤打刻: " + clock_out_str + "（" + diff_str + "）\n\n"
+                        + "修正申請をお願いします。"
+                    )
+
+                    if lw_api.send_message(lw_id, message):
+                        db.record_alert(emp_key, "deviation", today_str, message)
+                        deviation_notified += 1
+                        logger.info("乖離通知: %s %s (%s, シフト%s, 退勤%s)",
+                                    emp_code, emp_name, store_name, shift_end_str, clock_out_str)
+
+                # === 申請リマインド ===
+                elif db.was_alert_sent(emp_key, "deviation", today_str):
+                    reminder_count = db.count_alerts_today(emp_key, "request_reminder", today_str)
+                    if reminder_count >= MAX_REQUEST_REMINDERS:
+                        continue
+
+                    round_num = reminder_count + 1
+                    message = (
+                        "🔔 申請リマインド（" + str(round_num) + "回目）\n\n"
+                        + "シフト終了: " + shift_end_str + "\n"
+                        + "退勤打刻: " + clock_out_str + "（" + diff_str + "）\n\n"
+                        + "修正申請がまだ提出されていません。\n"
+                        + "お早めに申請をお願いします。"
+                    )
+
+                    if lw_api.send_message(lw_id, message):
+                        db.record_alert(emp_key, "request_reminder", today_str, message)
+                        reminder_notified += 1
+                        logger.info("申請リマインド(%d回目): %s %s (%s)",
+                                    round_num, emp_code, emp_name, store_name)
+
+    logger.info("出勤アラーム: %d名, 退勤アラーム: %d名, 出勤なし: %d名, 超過: %d名, 乖離: %d名, リマインド: %d名",
+                clockin_alarm_sent, clockout_alarm_sent, late_clockin_notified,
+                overtime_notified, deviation_notified, reminder_notified)
+
+    # ========================================
+    # 23:00 速報（打刻ベースのみ、申請情報なし）
+    # ========================================
+    if now.hour == 23:
+        send_nightly_report(today_str, all_emps)
+
+    # ========================================
+    # 10:10 翌朝申請漏れチェック（前日分）
+    # ========================================
+    if now.hour == 10 and now.minute < 20:
+        yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        send_morning_request_check(yesterday, all_emps)
+
+    logger.info("=" * 50)
+
+
+# 管理者LW ID
+ADMIN_LW_ID = "sakamoto.tatsuya@avivastarscorporation"
+
+
+def send_nightly_report(today_str, all_emps):
+    """23:00 速報: 打刻ベースの出退勤状況・乖離のみ"""
+    conn = db.get_conn()
+    rows = conn.execute(
+        "SELECT employee_key, flow_type FROM alerts_sent WHERE alert_date=?",
+        (today_str,)
+    ).fetchall()
+    conn.close()
+
+    # flow_type別に集計
+    counts = {}
+    problem_names = {}
+    for row in rows:
+        ft = row["flow_type"]
+        ek = row["employee_key"]
+        counts[ft] = counts.get(ft, 0) + 1
+        emp = all_emps.get(ek, {})
+        name = emp.get("last_name", "?")
+        if ft not in problem_names:
+            problem_names[ft] = set()
+        problem_names[ft].add(name)
+
+    # 打刻ベースの項目のみ（申請関連を除外）
+    flow_labels = {
+        "clockin_alarm": "出勤アラーム",
+        "clockout_alarm": "退勤アラーム",
+        "late_clockin": "出勤打刻なし",
+        "overtime": "超過警告",
+        "deviation": "乖離通知",
+    }
+
+    has_problem = any(counts.get(ft, 0) > 0 for ft in ("late_clockin", "overtime", "deviation"))
+
+    lines = ["📊 本日の勤怠速報（" + today_str + "）\n"]
+
+    for ft, label in flow_labels.items():
+        cnt = counts.get(ft, 0)
+        if cnt > 0:
+            names = "、".join(sorted(problem_names.get(ft, set())))
+            if ft in ("clockin_alarm", "clockout_alarm"):
+                lines.append(label + ": " + str(cnt) + "件")
+            else:
+                lines.append(label + ": " + str(cnt) + "件（" + names + "）")
+        else:
+            lines.append(label + ": 0件")
+
+    if not has_problem:
+        lines.append("\n全員正常に打刻されました。")
+    else:
+        lines.append("\n※申請状況は明朝チェックします。")
+
+    message = "\n".join(lines)
+    if lw_api.send_message(ADMIN_LW_ID, message):
+        logger.info("23:00速報送信完了")
+    else:
+        logger.error("23:00速報送信失敗")
+
+
+def send_morning_request_check(yesterday_str, all_emps):
+    """翌朝10:10: 前日のシフト超過者で申請未提出の人をチェック"""
+    # 既に送信済みならスキップ（1日1回）
+    conn = db.get_conn()
+    already = conn.execute(
+        "SELECT COUNT(*) as cnt FROM alerts_sent WHERE employee_key='__admin__' AND flow_type='morning_check' AND alert_date=?",
+        (yesterday_str,)
+    ).fetchone()
+    if already and already["cnt"] > 0:
+        conn.close()
+        logger.info("翌朝チェック: %s分は送信済み", yesterday_str)
+        return
+    conn.close()
+
+    # 前日に乖離通知を受けた人を取得
+    conn = db.get_conn()
+    deviation_rows = conn.execute(
+        "SELECT DISTINCT employee_key FROM alerts_sent WHERE alert_date=? AND flow_type='deviation'",
+        (yesterday_str,)
+    ).fetchall()
+    conn.close()
+
+    if not deviation_rows:
+        message = (
+            "📋 前日の申請チェック（" + yesterday_str + "）\n\n"
+            + "シフト超過者なし。申請チェック不要です。"
+        )
+        lw_api.send_message(ADMIN_LW_ID, message)
+        # 送信済み記録
+        db.record_alert("__admin__", "morning_check", yesterday_str, "no_deviation")
+        logger.info("翌朝チェック送信（超過者なし）")
+        return
+
+    # KOT申請データ取得
+    tr_requests = get_timerecord_requests(yesterday_str)
+
+    no_request = []
+    has_request = []
+    for row in deviation_rows:
+        ek = row["employee_key"]
+        emp = all_emps.get(ek, {})
+        name = emp.get("last_name", "?") + " " + emp.get("first_name", "")
+        if has_request_for_today(ek, tr_requests):
+            has_request.append(name)
+        else:
+            no_request.append(name)
+
+    lines = ["📋 前日の申請チェック（" + yesterday_str + "）\n"]
+
+    if no_request:
+        lines.append("❌ 未申請: " + "、".join(no_request))
+    if has_request:
+        lines.append("✅ 申請済: " + "、".join(has_request))
+    if not no_request:
+        lines.append("\n全員申請済みです。")
+
+    message = "\n".join(lines)
+    if lw_api.send_message(ADMIN_LW_ID, message):
+        db.record_alert("__admin__", "morning_check", yesterday_str, message)
+        logger.info("翌朝チェック送信完了（未申請: %d名, 申請済: %d名）", len(no_request), len(has_request))
+    else:
+        logger.error("翌朝チェック送信失敗")
+
+
+if __name__ == "__main__":
+    main()

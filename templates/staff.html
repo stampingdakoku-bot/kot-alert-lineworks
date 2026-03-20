@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}スタッフ管理{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>スタッフ一覧</h2>
+    <div style="margin-bottom:16px">
+        <button class="btn btn-primary" onclick="document.getElementById('addModal').style.display='block'">+ スタッフ追加</button>
+    </div>
+    <table>
+        <thead>
+            <tr><th>社員コード</th><th>氏名</th><th>KoTキー</th><th>LW アカウント</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+            {% for emp in employees %}
+            <tr>
+                <td>{{ emp.employee_code or '' }}</td>
+                <td>{{ emp.last_name or '' }} {{ emp.first_name or '' }}</td>
+                <td style="font-size:12px">{{ emp.employee_key[:16] }}...</td>
+                <td>{{ emp.mappings[0].lw_account_id if emp.mappings else '-' }}</td>
+                <td>
+                    <button class="btn btn-primary" onclick="openEdit('{{ emp.employee_key }}', '{{ emp.employee_code or '' }}', '{{ emp.last_name or '' }}', '{{ emp.first_name or '' }}', '{{ emp.mappings[0].lw_account_id if emp.mappings else '' }}')">編集</button>
+                    <form method="POST" action="/staff/{{ emp.employee_key }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
+                        <button class="btn btn-danger">削除</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not employees %}
+            <tr><td colspan="5" style="text-align:center;color:#999">スタッフが登録されていません</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Modal -->
+<div id="addModal" class="modal-bg" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal">
+        <h3>スタッフ追加</h3>
+        <form method="POST" action="/staff/add">
+            <div class="form-row"><label>KoTキー</label><input name="employee_key" required style="flex:1"></div>
+            <div class="form-row"><label>社員コード</label><input name="employee_code" style="flex:1"></div>
+            <div class="form-row"><label>姓</label><input name="last_name" style="flex:1"></div>
+            <div class="form-row"><label>名</label><input name="first_name" style="flex:1"></div>
+            <div class="form-row"><label>LWアカウント</label><input name="lw_account_id" style="flex:1" placeholder="例: av.33155@avivastarscorporation"></div>
+            <div style="margin-top:16px;text-align:right">
+                <button type="button" class="btn" onclick="this.closest('.modal-bg').style.display='none'">キャンセル</button>
+                <button type="submit" class="btn btn-success">追加</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal-bg" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal">
+        <h3>スタッフ編集</h3>
+        <form method="POST" id="editForm">
+            <div class="form-row"><label>社員コード</label><input name="employee_code" id="edit_code" style="flex:1"></div>
+            <div class="form-row"><label>姓</label><input name="last_name" id="edit_last" style="flex:1"></div>
+            <div class="form-row"><label>名</label><input name="first_name" id="edit_first" style="flex:1"></div>
+            <div class="form-row"><label>LWアカウント</label><input name="lw_account_id" id="edit_lw" style="flex:1"></div>
+            <div style="margin-top:16px;text-align:right">
+                <button type="button" class="btn" onclick="this.closest('.modal-bg').style.display='none'">キャンセル</button>
+                <button type="submit" class="btn btn-success">更新</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function openEdit(key, code, last, first, lw) {
+    document.getElementById('editForm').action = '/staff/' + key + '/edit';
+    document.getElementById('edit_code').value = code;
+    document.getElementById('edit_last').value = last;
+    document.getElementById('edit_first').value = first;
+    document.getElementById('edit_lw').value = lw;
+    document.getElementById('editModal').style.display = 'block';
+}
+</script>
+{% endblock %}

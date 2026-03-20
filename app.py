@@ -416,80 +416,97 @@ def shifts():
     today = date.today()
     dates = [(today + timedelta(days=i)) for i in range(7)]
     today_str = today.isoformat()
+    end_date = dates[-1]
 
+    # Default to first store tab
+    active_store = request.args.get('store', stores[0]['store_name'] if stores else '')
+
+    # Build store_shifts: only fetch calendar for the active store
     store_shifts = []
     for store in stores:
+        if store['store_name'] != active_store:
+            store_shifts.append({
+                'store_name': store['store_name'],
+                'closing_hour': store['closing_hour'],
+                'days': [],
+            })
+            continue
+
         uid = store.get('user_for_api', '')
         cid = store.get('calendar_id', '')
-        days = []
 
-        for d in dates:
-            d_str = d.isoformat()
-            day_shifts = []
+        # Fetch 7 days in a single API call
+        all_events = []
+        if token and uid and cid:
+            from_dt = today_str + "T00:00:00+09:00"
+            until_dt = end_date.isoformat() + "T23:59:59+09:00"
+            url = (
+                "https://www.worksapis.com/v1.0/users/" + uid
+                + "/calendars/" + cid
+                + "/events?fromDateTime=" + from_dt.replace("+", "%2B")
+                + "&untilDateTime=" + until_dt.replace("+", "%2B")
+                + "&count=500"
+            )
+            try:
+                r = req_lib.get(url, headers=headers, timeout=30)
+                if r.status_code == 200:
+                    all_events = r.json().get("events", [])
+            except Exception:
+                pass
 
-            if token and uid and cid:
-                from_dt = d_str + "T00:00:00+09:00"
-                until_dt = d_str + "T23:59:59+09:00"
-                url = (
-                    "https://www.worksapis.com/v1.0/users/" + uid
-                    + "/calendars/" + cid
-                    + "/events?fromDateTime=" + from_dt.replace("+", "%2B")
-                    + "&untilDateTime=" + until_dt.replace("+", "%2B")
-                    + "&count=100"
-                )
+        # Group events by date
+        events_by_date = {}
+        for event in all_events:
+            components = event.get("eventComponents", [])
+            if not components:
+                continue
+            comp = components[0]
+            summary = comp.get("summary", "")
+
+            shift_name = None
+            m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
+            if m:
+                shift_name = m.group(1).strip()
+            else:
+                m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
+                if m2:
+                    shift_name = m2.group(1).strip()
+
+            if not shift_name:
+                continue
+
+            start_info = comp.get("start", {})
+            end_info = comp.get("end", {})
+            start_dt_str = start_info.get("dateTime", "")
+            end_dt_str = end_info.get("dateTime", "")
+            start_time = ""
+            end_time = ""
+            event_date = None
+            if start_dt_str:
                 try:
-                    r = req_lib.get(url, headers=headers, timeout=15)
-                    if r.status_code == 200:
-                        events = r.json().get("events", [])
-                        for event in events:
-                            components = event.get("eventComponents", [])
-                            if not components:
-                                continue
-                            comp = components[0]
-                            summary = comp.get("summary", "")
-
-                            shift_name = None
-                            m = re.match(r'^\d{1,2}[:\-]\d{1,2}\s*[\-〜~]\s*\d{1,2}[:\-]?\d{0,2}\s+(.+)$', summary.strip())
-                            if m:
-                                shift_name = m.group(1).strip()
-                            else:
-                                m2 = re.match(r'^\d{1,2}-\d{1,2}\s*(.+)$', summary.strip())
-                                if m2:
-                                    shift_name = m2.group(1).strip()
-
-                            if not shift_name:
-                                continue
-
-                            start_info = comp.get("start", {})
-                            end_info = comp.get("end", {})
-                            start_dt_str = start_info.get("dateTime", "")
-                            end_dt_str = end_info.get("dateTime", "")
-                            start_time = ""
-                            end_time = ""
-                            if start_dt_str:
-                                try:
-                                    s = datetime.fromisoformat(start_dt_str)
-                                    start_time = f"{s.hour}:{s.minute:02d}"
-                                except (ValueError, TypeError):
-                                    pass
-                            if end_dt_str:
-                                try:
-                                    e = datetime.fromisoformat(end_dt_str)
-                                    end_time = f"{e.hour}:{e.minute:02d}"
-                                except (ValueError, TypeError):
-                                    pass
-
-                            day_shifts.append({
-                                'name': shift_name,
-                                'start': start_time,
-                                'end': end_time,
-                            })
-                except Exception:
+                    s = datetime.fromisoformat(start_dt_str)
+                    start_time = f"{s.hour}:{s.minute:02d}"
+                    event_date = s.strftime("%Y-%m-%d")
+                except (ValueError, TypeError):
+                    pass
+            if end_dt_str:
+                try:
+                    e = datetime.fromisoformat(end_dt_str)
+                    end_time = f"{e.hour}:{e.minute:02d}"
+                except (ValueError, TypeError):
                     pass
 
-            # Sort by start time
-            day_shifts.sort(key=lambda x: x['start'])
+            if event_date:
+                events_by_date.setdefault(event_date, []).append({
+                    'name': shift_name,
+                    'start': start_time,
+                    'end': end_time,
+                })
 
+        days = []
+        for d in dates:
+            d_str = d.isoformat()
+            day_shifts = sorted(events_by_date.get(d_str, []), key=lambda x: x['start'])
             days.append({
                 'date': d_str,
                 'weekday': ['月', '火', '水', '木', '金', '土', '日'][d.weekday()],
@@ -502,9 +519,6 @@ def shifts():
             'closing_hour': store['closing_hour'],
             'days': days,
         })
-
-    # Default to first store tab
-    active_store = request.args.get('store', stores[0]['store_name'] if stores else '')
 
     return render_template('shifts.html',
                            store_shifts=store_shifts,

@@ -6,6 +6,9 @@
     <div style="margin-bottom:16px">
         <button class="btn btn-primary" onclick="document.getElementById('addStoreModal').style.display='block'">+ 店舗追加</button>
     </div>
+
+    {# === PC: テーブル表示 === #}
+    <div class="table-wrap store-table-pc">
     <table>
         <thead>
             <tr><th>店舗名</th><th>カレンダーID</th><th>API用ユーザー</th><th>閉店時刻</th><th>状態</th><th>操作</th></tr>
@@ -18,7 +21,7 @@
                 <td style="font-size:12px">{{ s.user_for_api }}</td>
                 <td>{{ s.closing_hour }}:00</td>
                 <td><span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ '有効' if s.is_active else '無効' }}</span></td>
-                <td>
+                <td style="white-space:nowrap">
                     <button class="btn btn-primary" onclick="openStoreEdit('{{ s.store_name }}', '{{ s.calendar_id }}', '{{ s.user_for_api }}', {{ s.closing_hour }}, {{ 'true' if s.is_active else 'false' }})">編集</button>
                     <form method="POST" action="/stores/{{ s.store_name }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
                         <button class="btn btn-danger">削除</button>
@@ -28,6 +31,28 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
+
+    {# === スマホ: カード表示 === #}
+    <div class="store-cards-sp">
+        {% for s in stores %}
+        <div class="store-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:16px;font-weight:600">{{ s.store_name }}</span>
+                <span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ '有効' if s.is_active else '無効' }}</span>
+            </div>
+            <div style="font-size:12px;color:#666;margin-bottom:4px">閉店: {{ s.closing_hour }}:00</div>
+            <div style="font-size:11px;color:#999;margin-bottom:4px;word-break:break-all">ID: {{ s.calendar_id }}</div>
+            <div style="font-size:11px;color:#999;margin-bottom:10px;word-break:break-all">API: {{ s.user_for_api }}</div>
+            <div style="display:flex;gap:6px">
+                <button class="btn btn-primary" onclick="openStoreEdit('{{ s.store_name }}', '{{ s.calendar_id }}', '{{ s.user_for_api }}', {{ s.closing_hour }}, {{ 'true' if s.is_active else 'false' }})">編集</button>
+                <form method="POST" action="/stores/{{ s.store_name }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
+                    <button class="btn btn-danger">削除</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
 
 <!-- Add Store Modal -->
@@ -57,7 +82,7 @@
             <div class="form-row"><label>カレンダーID</label><input name="calendar_id" id="es_cal" required style="flex:1"></div>
             <div class="form-row"><label>API用ユーザー</label><input name="user_for_api" id="es_user" required style="flex:1"></div>
             <div class="form-row"><label>閉店時刻</label><input name="closing_hour" id="es_hour" type="number" min="0" max="23" required style="width:80px"></div>
-            <div class="form-row"><label>有効</label><input type="checkbox" name="is_active" id="es_active"></div>
+            <div class="form-row"><label>有効</label><input type="checkbox" name="is_active" id="es_active" style="min-height:auto;width:20px;height:20px"></div>
             <div style="margin-top:16px;text-align:right">
                 <button type="button" class="btn" onclick="this.closest('.modal-bg').style.display='none'">キャンセル</button>
                 <button type="submit" class="btn btn-success">更新</button>
@@ -65,6 +90,15 @@
         </form>
     </div>
 </div>
+
+<style>
+.store-cards-sp { display: none; }
+.store-card { background: #f8f9fa; border-radius: 8px; padding: 14px; margin-bottom: 10px; border: 1px solid #eee; }
+@media (max-width: 768px) {
+    .store-table-pc { display: none; }
+    .store-cards-sp { display: block; }
+}
+</style>
 {% endblock %}
 {% block scripts %}
 <script>

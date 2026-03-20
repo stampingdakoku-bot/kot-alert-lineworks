@@ -4,20 +4,20 @@
 
 {# ===== アラートバナー ===== #}
 {% if unmapped_count > 0 %}
-<div style="background:#e74c3c;color:white;padding:12px 20px;border-radius:6px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
-    <span>
+<div class="alert-banner" style="background:#e74c3c;color:white;padding:12px 16px;border-radius:6px;margin-bottom:16px">
+    <div>
         <strong>マッピング未設定のスタッフが{{ unmapped_count }}名います</strong>
-        （{% for u in unmapped_names %}{{ u.last_name }} {{ u.first_name }}{% if not loop.last %}、{% endif %}{% endfor %}{% if unmapped_count > 5 %} 他{% endif %}）
-        — LINE WORKS通知が届きません
-    </span>
-    <a href="/staff" style="color:white;background:rgba(255,255,255,0.2);padding:6px 16px;border-radius:4px;text-decoration:none;white-space:nowrap">スタッフ管理へ</a>
+        <span style="font-size:13px">（{% for u in unmapped_names %}{{ u.last_name }} {{ u.first_name }}{% if not loop.last %}、{% endif %}{% endfor %}{% if unmapped_count > 5 %} 他{% endif %}）
+        — LINE WORKS通知が届きません</span>
+    </div>
+    <a href="/staff" style="color:white;background:rgba(255,255,255,0.2);padding:8px 16px;border-radius:4px;text-decoration:none;white-space:nowrap;display:inline-block;margin-top:8px;min-height:44px;line-height:28px">スタッフ管理へ</a>
 </div>
 {% endif %}
 
 <h2 style="margin-bottom:16px">ダッシュボード — {{ today[5:].replace('-', '/') }}</h2>
 
-{# ===== 店舗カード 2x2グリッド ===== #}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+{# ===== 店舗カード グリッド ===== #}
+<div class="store-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     {% for card in store_cards %}
     <div class="card" style="padding:20px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -41,6 +41,7 @@
         <div style="font-size:12px;color:#999;margin-bottom:6px">
             本日の出勤予定: {{ card.staff_scheduled|length }}名
         </div>
+        <div class="table-wrap">
         <table style="margin-bottom:0">
             <thead>
                 <tr>
@@ -75,8 +76,8 @@
                         {% endif %}
                     </td>
                     <td style="font-size:14px">{{ staff.name }}</td>
-                    <td style="font-size:13px;color:#666">{{ staff.shift_time }}</td>
-                    <td style="font-size:12px">
+                    <td style="font-size:13px;color:#666;white-space:nowrap">{{ staff.shift_time }}</td>
+                    <td style="font-size:12px;white-space:nowrap">
                         {% if is_in %}
                             {% for c in card.staff_clocked_in %}
                                 {% if c.emp_key == staff.emp_key %}
@@ -100,6 +101,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% else %}
         <div style="text-align:center;color:#999;padding:24px 0;font-size:14px">
             本日のシフトはありません
@@ -116,7 +118,7 @@
 </div>
 
 {# ===== 通知サマリー + 最近の通知 ===== #}
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+<div class="summary-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
 
     {# --- 左: 通知サマリー --- #}
     <div class="card">
@@ -141,6 +143,7 @@
     {# --- 右: 最近の通知 --- #}
     <div class="card" style="max-height:400px;overflow-y:auto">
         <h2>最近の通知</h2>
+        <div class="table-wrap">
         <table>
             <thead><tr><th style="width:80px">日時</th><th style="width:80px">スタッフ</th><th style="width:100px">種別</th><th>メッセージ</th></tr></thead>
             <tbody>
@@ -151,7 +154,7 @@
                     <td>
                         {% set ft = log.flow_type %}
                         {% set is_warn = ft in ('late_clockin', 'overtime', 'deviation') %}
-                        <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white">{{ flow_labels.get(ft, ft) }}</span>
+                        <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white;white-space:nowrap">{{ flow_labels.get(ft, ft) }}</span>
                     </td>
                     <td style="white-space:pre-wrap;word-break:break-all;font-size:12px;color:#555">{{ log.message or '' }}</td>
                 </tr>
@@ -161,6 +164,7 @@
                 {% endif %}
             </tbody>
         </table>
+        </div>
     </div>
 </div>
 
@@ -168,11 +172,12 @@
 {% if problem_late or problem_overtime %}
 <div class="card">
     <h2 style="color:#e74c3c">注意が必要なスタッフ</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="problem-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
         {% if problem_late %}
         <div>
             <h3 style="font-size:14px;margin-bottom:8px;color:#e67e22">出勤打刻なし</h3>
+            <div class="table-wrap">
             <table>
                 <thead><tr><th>社員コード</th><th>氏名</th><th>通知回数</th></tr></thead>
                 <tbody>
@@ -185,12 +190,14 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
         {% endif %}
 
         {% if problem_overtime %}
         <div>
             <h3 style="font-size:14px;margin-bottom:8px;color:#e74c3c">超過警告</h3>
+            <div class="table-wrap">
             <table>
                 <thead><tr><th>社員コード</th><th>氏名</th><th>通知回数</th></tr></thead>
                 <tbody>
@@ -203,10 +210,19 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
         {% endif %}
     </div>
 </div>
 {% endif %}
+
+<style>
+@media (max-width: 768px) {
+    .store-grid { grid-template-columns: 1fr !important; }
+    .summary-grid { grid-template-columns: 1fr !important; }
+    .problem-grid { grid-template-columns: 1fr !important; }
+}
+</style>
 
 {% endblock %}

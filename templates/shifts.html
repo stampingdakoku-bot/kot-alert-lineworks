@@ -5,15 +5,15 @@
 <h2 style="margin-bottom:16px">シフト一覧 — {{ today[5:].replace('-', '/') }} から7日間</h2>
 
 {# ===== 店舗タブ ===== #}
-<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #ddd">
+<div class="store-tabs" style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #ddd;overflow-x:auto;-webkit-overflow-scrolling:touch">
     {% for store in store_shifts %}
     <a href="?store={{ store.store_name }}"
-       style="padding:10px 20px;text-decoration:none;font-size:14px;font-weight:600;
+       style="padding:12px 20px;text-decoration:none;font-size:14px;font-weight:600;
               border-bottom:3px solid {{ '#3498db' if store.store_name == active_store else 'transparent' }};
               color:{{ '#3498db' if store.store_name == active_store else '#666' }};
-              margin-bottom:-2px">
+              margin-bottom:-2px;white-space:nowrap;min-height:44px;display:flex;align-items:center">
         {{ store.store_name }}
-        <span style="font-size:11px;color:#999;font-weight:normal">〜{{ store.closing_hour }}:00</span>
+        <span style="font-size:11px;color:#999;font-weight:normal;margin-left:4px">〜{{ store.closing_hour }}:00</span>
     </a>
     {% endfor %}
 </div>
@@ -22,11 +22,11 @@
 {% for store in store_shifts %}
 {% if store.store_name == active_store %}
 <div class="card" style="padding:0;overflow:hidden">
-    <div style="overflow-x:auto">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
         <table style="margin-bottom:0">
             <thead>
                 <tr>
-                    <th style="width:140px;position:sticky;left:0;background:#f8f9fa;z-index:1">日付</th>
+                    <th style="width:100px;position:sticky;left:0;background:#f8f9fa;z-index:1">日付</th>
                     <th>スタッフ / シフト</th>
                 </tr>
             </thead>
@@ -50,7 +50,7 @@
                         {% if day.shifts %}
                         <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">
                             {% for shift in day.shifts %}
-                            <div style="display:inline-flex;align-items:center;gap:6px;background:#f8f9fa;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid #eee">
+                            <div style="display:inline-flex;align-items:center;gap:6px;background:#f8f9fa;border-radius:6px;padding:8px 12px;font-size:13px;border:1px solid #eee">
                                 <span style="font-weight:600">{{ shift.name }}</span>
                                 <span style="color:#666;font-size:12px">{{ shift.start }}〜{{ shift.end }}</span>
                             </div>
@@ -74,5 +74,12 @@
     店舗が登録されていません
 </div>
 {% endif %}
+
+<style>
+@media (max-width: 768px) {
+    .store-tabs::-webkit-scrollbar { display: none; }
+    .store-tabs { scrollbar-width: none; }
+}
+</style>
 
 {% endblock %}

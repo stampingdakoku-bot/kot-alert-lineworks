@@ -9,33 +9,33 @@
 {# ===== 出勤アラート ===== #}
 <div class="card">
     <h2>出勤アラート</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="settings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="clockin_alarm_enabled" {{ 'checked' if s.get('clockin_alarm_enabled', true) }}>
+                <input type="checkbox" name="clockin_alarm_enabled" {{ 'checked' if s.get('clockin_alarm_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>出勤アラーム</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">シフト開始時刻に打刻リマインドを送信</div>
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">シフト開始時刻に打刻リマインドを送信</div>
         </div>
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="late_clockin_enabled" {{ 'checked' if s.get('late_clockin_enabled', true) }}>
+                <input type="checkbox" name="late_clockin_enabled" {{ 'checked' if s.get('late_clockin_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>打刻なし検知</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">シフト開始後に打刻がない場合に繰り返し通知</div>
-            <div style="margin-top:12px;margin-left:24px;display:flex;flex-wrap:wrap;gap:12px">
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">開始</label>
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">シフト開始後に打刻がない場合に繰り返し通知</div>
+            <div style="margin-top:12px;margin-left:28px;display:flex;flex-wrap:wrap;gap:12px">
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">開始</label>
                     <input type="number" name="late_clockin_start_minutes" value="{{ s.get('late_clockin_start_minutes', 10) }}" min="1" max="60" style="width:60px">
                     <span style="font-size:13px">分後</span>
                 </div>
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">間隔</label>
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">間隔</label>
                     <input type="number" name="late_clockin_interval_minutes" value="{{ s.get('late_clockin_interval_minutes', 10) }}" min="1" max="60" style="width:60px">
                     <span style="font-size:13px">分</span>
                 </div>
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">最大</label>
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">最大</label>
                     <input type="number" name="late_clockin_max_count" value="{{ s.get('late_clockin_max_count', 4) }}" min="1" max="10" style="width:60px">
                     <span style="font-size:13px">回</span>
                 </div>
@@ -47,61 +47,61 @@
 {# ===== 退勤アラート ===== #}
 <div class="card">
     <h2>退勤アラート</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="settings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="clockout_alarm_enabled" {{ 'checked' if s.get('clockout_alarm_enabled', true) }}>
+                <input type="checkbox" name="clockout_alarm_enabled" {{ 'checked' if s.get('clockout_alarm_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>退勤アラーム</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">シフト終了時刻に退勤リマインドを送信</div>
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">シフト終了時刻に退勤リマインドを送信</div>
         </div>
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="overtime_enabled" {{ 'checked' if s.get('overtime_enabled', true) }}>
+                <input type="checkbox" name="overtime_enabled" {{ 'checked' if s.get('overtime_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>超過警告</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">シフト終了後に退勤打刻がない場合に繰り返し通知</div>
-            <div style="margin-top:12px;margin-left:24px;display:flex;flex-wrap:wrap;gap:12px">
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">開始</label>
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">シフト終了後に退勤打刻がない場合に繰り返し通知</div>
+            <div style="margin-top:12px;margin-left:28px;display:flex;flex-wrap:wrap;gap:12px">
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">開始</label>
                     <input type="number" name="overtime_start_minutes" value="{{ s.get('overtime_start_minutes', 10) }}" min="1" max="60" style="width:60px">
                     <span style="font-size:13px">分後</span>
                 </div>
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">間隔</label>
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">間隔</label>
                     <input type="number" name="overtime_interval_minutes" value="{{ s.get('overtime_interval_minutes', 10) }}" min="1" max="60" style="width:60px">
                     <span style="font-size:13px">分</span>
                 </div>
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">最大</label>
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">最大</label>
                     <input type="number" name="overtime_max_count" value="{{ s.get('overtime_max_count', 4) }}" min="1" max="10" style="width:60px">
                     <span style="font-size:13px">回</span>
                 </div>
             </div>
         </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+    <div class="settings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="deviation_enabled" {{ 'checked' if s.get('deviation_enabled', true) }}>
+                <input type="checkbox" name="deviation_enabled" {{ 'checked' if s.get('deviation_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>乖離通知</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">退勤打刻とシフト終了のズレを通知</div>
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">退勤打刻とシフト終了のズレを通知</div>
         </div>
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="request_reminder_enabled" {{ 'checked' if s.get('request_reminder_enabled', true) }}>
+                <input type="checkbox" name="request_reminder_enabled" {{ 'checked' if s.get('request_reminder_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>申請リマインド</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">乖離通知後に申請がない場合にリマインド</div>
-            <div style="margin-top:12px;margin-left:24px;display:flex;flex-wrap:wrap;gap:12px">
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">間隔</label>
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">乖離通知後に申請がない場合にリマインド</div>
+            <div style="margin-top:12px;margin-left:28px;display:flex;flex-wrap:wrap;gap:12px">
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">間隔</label>
                     <input type="number" name="request_reminder_interval_minutes" value="{{ s.get('request_reminder_interval_minutes', 10) }}" min="1" max="60" style="width:60px">
                     <span style="font-size:13px">分</span>
                 </div>
-                <div class="form-row">
-                    <label style="font-size:13px;min-width:auto">最大</label>
+                <div style="display:flex;gap:4px;align-items:center">
+                    <label style="font-size:13px">最大</label>
                     <input type="number" name="request_reminder_max_count" value="{{ s.get('request_reminder_max_count', 2) }}" min="1" max="10" style="width:60px">
                     <span style="font-size:13px">回</span>
                 </div>
@@ -114,19 +114,19 @@
 <div class="card">
     <h2>管理者設定</h2>
     <div style="margin-bottom:16px">
-        <div class="form-row">
-            <label style="font-size:14px;min-width:180px"><strong>日次サマリー送信先</strong></label>
-            <input type="text" name="admin_lw_id" value="{{ s.get('admin_lw_id', '') }}" style="flex:1" placeholder="例: sakamoto.tatsuya@avivastarscorporation">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:14px;white-space:nowrap"><strong>日次サマリー送信先</strong></label>
+            <input type="text" name="admin_lw_id" value="{{ s.get('admin_lw_id', '') }}" style="flex:1;min-width:200px" placeholder="例: sakamoto.tatsuya@avivastarscorporation">
         </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="settings-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="daily_summary_enabled" {{ 'checked' if s.get('daily_summary_enabled', true) }}>
+                <input type="checkbox" name="daily_summary_enabled" {{ 'checked' if s.get('daily_summary_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>日次サマリー</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">毎日の勤怠速報を管理者に送信</div>
-            <div style="margin-top:12px;margin-left:24px;display:flex;gap:8px;align-items:center">
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">毎日の勤怠速報を管理者に送信</div>
+            <div style="margin-top:12px;margin-left:28px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <label style="font-size:13px">送信時刻</label>
                 <input type="number" name="daily_summary_hour" value="{{ s.get('daily_summary_hour', 23) }}" min="0" max="23" style="width:50px">
                 <span style="font-size:13px">:</span>
@@ -135,11 +135,11 @@
         </div>
         <div>
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
-                <input type="checkbox" name="morning_check_enabled" {{ 'checked' if s.get('morning_check_enabled', true) }}>
+                <input type="checkbox" name="morning_check_enabled" {{ 'checked' if s.get('morning_check_enabled', true) }} style="min-height:auto;width:20px;height:20px">
                 <strong>翌朝チェック</strong>
             </label>
-            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:24px">前日の申請漏れを翌朝チェック</div>
-            <div style="margin-top:12px;margin-left:24px;display:flex;gap:8px;align-items:center">
+            <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">前日の申請漏れを翌朝チェック</div>
+            <div style="margin-top:12px;margin-left:28px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <label style="font-size:13px">チェック時刻</label>
                 <input type="number" name="morning_check_hour" value="{{ s.get('morning_check_hour', 10) }}" min="0" max="23" style="width:50px">
                 <span style="font-size:13px">:</span>
@@ -150,7 +150,7 @@
 </div>
 
 <div style="text-align:right;margin-bottom:24px">
-    <button type="submit" class="btn btn-success" style="padding:10px 32px;font-size:15px">設定を保存</button>
+    <button type="submit" class="btn btn-success" style="padding:12px 32px;font-size:15px">設定を保存</button>
 </div>
 
 </form>
@@ -160,5 +160,11 @@
     最終更新: {{ s.updated_at[:19].replace('T', ' ') }}
 </div>
 {% endif %}
+
+<style>
+@media (max-width: 768px) {
+    .settings-grid { grid-template-columns: 1fr !important; }
+}
+</style>
 
 {% endblock %}

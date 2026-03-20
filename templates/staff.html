@@ -6,19 +6,38 @@
     <div style="margin-bottom:16px">
         <button class="btn btn-primary" onclick="document.getElementById('addModal').style.display='block'">+ スタッフ追加</button>
     </div>
+
+    {# === PC: テーブル表示 === #}
+    <div class="table-wrap staff-table-pc">
     <table>
         <thead>
             <tr><th>社員コード</th><th>氏名</th><th>KoTキー</th><th>LW アカウント</th><th>操作</th></tr>
         </thead>
         <tbody>
             {% for emp in employees %}
-            <tr>
+            {% set is_excluded = emp.get('is_excluded', false) %}
+            <tr style="{{ 'opacity:0.45;background:#f5f5f5' if is_excluded else '' }}">
                 <td>{{ emp.employee_code or '' }}</td>
                 <td>{{ emp.last_name or '' }} {{ emp.first_name or '' }}</td>
                 <td style="font-size:12px">{{ emp.employee_key[:16] }}...</td>
-                <td>{{ emp.mappings.lw_account_id if emp.mappings else '-' }}</td>
                 <td>
+                    {% if emp.mappings %}
+                        {{ emp.mappings.lw_account_id }}
+                    {% elif is_excluded %}
+                        <span style="color:#999">— 除外中</span>
+                    {% else %}
+                        <span style="color:#e74c3c">未設定</span>
+                    {% endif %}
+                </td>
+                <td style="white-space:nowrap">
                     <button class="btn btn-primary" onclick="openEdit('{{ emp.employee_key }}', '{{ emp.employee_code or '' }}', '{{ emp.last_name or '' }}', '{{ emp.first_name or '' }}', '{{ emp.mappings.lw_account_id if emp.mappings else '' }}')">編集</button>
+                    <form method="POST" action="/staff/{{ emp.employee_key }}/toggle_exclude" style="display:inline">
+                        {% if is_excluded %}
+                        <button class="btn" style="background:#95a5a6;color:white" title="クリックで除外解除">除外中</button>
+                        {% else %}
+                        <button class="btn" style="background:#f39c12;color:white" title="クリックで除外">除外</button>
+                        {% endif %}
+                    </form>
                     <form method="POST" action="/staff/{{ emp.employee_key }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
                         <button class="btn btn-danger">削除</button>
                     </form>
@@ -30,6 +49,50 @@
             {% endif %}
         </tbody>
     </table>
+    </div>
+
+    {# === スマホ: カード表示 === #}
+    <div class="staff-cards-sp">
+        {% for emp in employees %}
+        {% set is_excluded = emp.get('is_excluded', false) %}
+        <div class="staff-card" style="{{ 'opacity:0.45' if is_excluded else '' }}">
+            <div class="staff-card-header">
+                <span class="staff-card-code">{{ emp.employee_code or '' }}</span>
+                <span class="staff-card-name">{{ emp.last_name or '' }} {{ emp.first_name or '' }}</span>
+            </div>
+            <div class="staff-card-detail">
+                <span style="color:#999;font-size:12px">KoT:</span>
+                <span style="font-size:12px">{{ emp.employee_key[:16] }}...</span>
+            </div>
+            <div class="staff-card-detail">
+                <span style="color:#999;font-size:12px">LW:</span>
+                {% if emp.mappings %}
+                    <span style="font-size:12px;word-break:break-all">{{ emp.mappings.lw_account_id }}</span>
+                {% elif is_excluded %}
+                    <span style="color:#999;font-size:12px">— 除外中</span>
+                {% else %}
+                    <span style="color:#e74c3c;font-size:12px">未設定</span>
+                {% endif %}
+            </div>
+            <div class="staff-card-actions">
+                <button class="btn btn-primary" onclick="openEdit('{{ emp.employee_key }}', '{{ emp.employee_code or '' }}', '{{ emp.last_name or '' }}', '{{ emp.first_name or '' }}', '{{ emp.mappings.lw_account_id if emp.mappings else '' }}')">編集</button>
+                <form method="POST" action="/staff/{{ emp.employee_key }}/toggle_exclude" style="display:inline">
+                    {% if is_excluded %}
+                    <button class="btn" style="background:#95a5a6;color:white">除外中</button>
+                    {% else %}
+                    <button class="btn" style="background:#f39c12;color:white">除外</button>
+                    {% endif %}
+                </form>
+                <form method="POST" action="/staff/{{ emp.employee_key }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
+                    <button class="btn btn-danger">削除</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+        {% if not employees %}
+        <div style="text-align:center;color:#999;padding:24px">スタッフが登録されていません</div>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Add Modal -->
@@ -66,6 +129,20 @@
         </form>
     </div>
 </div>
+
+<style>
+.staff-cards-sp { display: none; }
+.staff-card { background: #f8f9fa; border-radius: 8px; padding: 14px; margin-bottom: 10px; border: 1px solid #eee; }
+.staff-card-header { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.staff-card-code { color: #3498db; margin-right: 8px; }
+.staff-card-detail { margin-bottom: 4px; display: flex; gap: 6px; align-items: baseline; }
+.staff-card-actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+
+@media (max-width: 768px) {
+    .staff-table-pc { display: none; }
+    .staff-cards-sp { display: block; }
+}
+</style>
 {% endblock %}
 {% block scripts %}
 <script>

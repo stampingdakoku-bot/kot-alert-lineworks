@@ -77,8 +77,17 @@ def _get_store_shifts_and_attendance(today_str):
     for e in all_employees.data:
         emp_by_key[e['employee_key']] = e
         last_name = (e.get('last_name') or '').strip()
+        first_name = (e.get('first_name') or '').strip()
         if last_name and last_name not in name_map:
             name_map[last_name] = e
+        # フルネーム（姓名）でもマッチできるように登録
+        if last_name and first_name:
+            full = last_name + first_name
+            if full not in name_map:
+                name_map[full] = e
+            full_sp = last_name + ' ' + first_name
+            if full_sp not in name_map:
+                name_map[full_sp] = e
 
     # LINE WORKS token for calendar API
     token = lw_api.get_access_token()

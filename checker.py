@@ -214,6 +214,9 @@ def main():
 
     # アラート設定をDBから取得
     settings = db.get_alert_settings()
+
+    # アラート文言テンプレートをDBから取得
+    alert_templates = db.get_alert_templates()
     MAX_LATE_CLOCKIN_ALERTS = settings.get('late_clockin_max_count', 4)
     MAX_OVERTIME_ALERTS = settings.get('overtime_max_count', 4)
     MAX_REQUEST_REMINDERS = settings.get('request_reminder_max_count', 2)
@@ -257,10 +260,10 @@ def main():
             # シフト開始時刻 〜 +10分の間（1回のみ）
             if settings.get('clockin_alarm_enabled', True) and shift_start <= now < shift_start + timedelta(minutes=10):
                 if not db.was_alert_sent(emp_key, "clockin_alarm", today_str):
-                    message = (
-                        "🔔 出勤時間になりました（" + shift_start_str + "）\n\n"
-                        + "打刻をお願いします。"
-                    )
+                    tmpl = alert_templates.get('clockin_alarm',
+                        '🔔 出勤時間になりました（{shift_start}）\n打刻をお願いします。')
+                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                          count='', clock_out='', diff='')
                     if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "clockin_alarm", today_str, message)
                         clockin_alarm_sent += 1
@@ -271,11 +274,10 @@ def main():
             # シフト終了時刻 〜 +10分の間（1回のみ）
             if settings.get('clockout_alarm_enabled', True) and shift_end <= now < shift_end + timedelta(minutes=10):
                 if not db.was_alert_sent(emp_key, "clockout_alarm", today_str):
-                    message = (
-                        "🔔 お疲れさまでした。\n\n"
-                        + "退勤時間になりました（" + shift_end_str + "）\n"
-                        + "打刻して速やかにお帰りください。"
-                    )
+                    tmpl = alert_templates.get('clockout_alarm',
+                        '🔔 お疲れさまでした。\n退勤時間になりました（{shift_end}）\n打刻して速やかにお帰りください。')
+                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                          count='', clock_out='', diff='')
                     if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "clockout_alarm", today_str, message)
                         clockout_alarm_sent += 1
@@ -324,13 +326,10 @@ def main():
                 alert_count = db.count_alerts_today(emp_key, "late_clockin", today_str)
                 if alert_count < MAX_LATE_CLOCKIN_ALERTS:
                     round_num = alert_count + 1
-                    message = (
-                        "🕐 出勤打刻の確認（" + str(round_num) + "回目）\n\n"
-                        + "シフト開始時刻（" + shift_start_str + "）を過ぎましたが、"
-                        + "出勤打刻が確認できません。\n\n"
-                        + "打刻漏れはないですか？\n"
-                        + "確認をお願いします。"
-                    )
+                    tmpl = alert_templates.get('late_clockin',
+                        '⚠️ 出勤打刻の確認（{count}回目）\nシフト開始時刻（{shift_start}）を過ぎましたが、出勤打刻が確認できません。\n打刻漏れはないですか？\n確認をお願いします。')
+                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                          count=str(round_num), clock_out='', diff='')
                     if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "late_clockin", today_str, message)
                         late_clockin_notified += 1
@@ -356,13 +355,10 @@ def main():
                     continue
 
                 round_num = alert_count + 1
-                message = (
-                    "⚠️ 勤務超過のお知らせ（" + str(round_num) + "回目）\n\n"
-                    + "シフト終了時刻（" + shift_end_str + "）を過ぎましたが、"
-                    + "退勤打刻が確認できません。\n\n"
-                    + "退勤打刻をお忘れではないですか？\n"
-                    + "残業の場合も、退勤後に打刻をお願いします。"
-                )
+                tmpl = alert_templates.get('overtime',
+                    '⚠️ 退勤打刻の確認（{count}回目）\nシフト終了時刻（{shift_end}）を過ぎましたが、退勤打刻が確認できません。\n打刻漏れはないですか？\n確認をお願いします。')
+                message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                      count=str(round_num), clock_out='', diff='')
 
                 if lw_api.send_message(lw_id, message):
                     db.record_alert(emp_key, "overtime", today_str, message)
@@ -394,12 +390,10 @@ def main():
 
                 # === 乖離通知 ===
                 if settings.get('deviation_enabled', True) and not db.was_alert_sent(emp_key, "deviation", today_str):
-                    message = (
-                        "📋 退勤時刻にズレがあります\n\n"
-                        + "シフト終了: " + shift_end_str + "\n"
-                        + "退勤打刻: " + clock_out_str + "（" + diff_str + "）\n\n"
-                        + "修正申請をお願いします。"
-                    )
+                    tmpl = alert_templates.get('deviation',
+                        '📋 勤務時間のお知らせ\nシフト終了: {shift_end}\n退勤打刻: {clock_out}（{diff}分超過）\n修正申請がまだ提出されていません。\nお早めに申請をお願いします。')
+                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                          count='', clock_out=clock_out_str, diff=str(diff_minutes))
 
                     if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "deviation", today_str, message)
@@ -414,13 +408,10 @@ def main():
                         continue
 
                     round_num = reminder_count + 1
-                    message = (
-                        "🔔 申請リマインド（" + str(round_num) + "回目）\n\n"
-                        + "シフト終了: " + shift_end_str + "\n"
-                        + "退勤打刻: " + clock_out_str + "（" + diff_str + "）\n\n"
-                        + "修正申請がまだ提出されていません。\n"
-                        + "お早めに申請をお願いします。"
-                    )
+                    tmpl = alert_templates.get('request_reminder',
+                        '📋 申請リマインド（{count}回目）\nシフト終了: {shift_end}\n退勤打刻: {clock_out}（{diff}分超過）\n修正申請がまだ提出されていません。\nお早めに申請をお願いします。')
+                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                          count=str(round_num), clock_out=clock_out_str, diff=str(diff_minutes))
 
                     if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "request_reminder", today_str, message)

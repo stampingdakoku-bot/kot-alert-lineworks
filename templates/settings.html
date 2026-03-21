@@ -153,6 +153,29 @@
     </div>
 </div>
 
+{# ===== アラート文言設定 ===== #}
+<div class="card">
+    <h2>アラート文言設定</h2>
+    <div style="font-size:12px;color:#888;margin-bottom:12px">
+        利用可能な変数: <code>{shift_start}</code> <code>{shift_end}</code> <code>{count}</code> <code>{clock_out}</code> <code>{diff}</code>
+    </div>
+    {% set tmpl_labels = {
+        'clockin_alarm': '出勤アラーム',
+        'late_clockin': '打刻なし検知',
+        'clockout_alarm': '退勤アラーム',
+        'overtime': '超過警告',
+        'deviation': '乖離通知',
+        'request_reminder': '申請リマインド',
+        'morning_check': '翌朝チェック'
+    } %}
+    {% for ft, label in tmpl_labels.items() %}
+    <div style="margin-bottom:16px">
+        <label style="font-size:13px;font-weight:bold;display:block;margin-bottom:4px">{{ label }} <code style="font-size:11px;color:#999">{{ ft }}</code></label>
+        <textarea name="template_{{ ft }}" rows="3" style="width:100%;font-size:13px;font-family:inherit;padding:8px;border:1px solid #ddd;border-radius:4px;resize:vertical">{{ templates.get(ft, '') }}</textarea>
+    </div>
+    {% endfor %}
+</div>
+
 <div style="text-align:right;margin-bottom:24px">
     <button type="submit" class="btn btn-success" style="padding:12px 32px;font-size:15px">設定を保存</button>
 </div>

@@ -180,3 +180,21 @@ def get_alert_settings():
         'morning_check_hour': 10,
         'morning_check_minute': 10,
     }
+
+
+def get_alert_templates():
+    """alert_templatesテーブルからテンプレートを全件取得"""
+    try:
+        result = supabase.table('alert_templates').select('*').execute()
+        return {r['flow_type']: r['template'] for r in result.data}
+    except Exception:
+        return {}
+
+
+def save_alert_template(flow_type, template):
+    """alert_templatesテーブルにテンプレートを保存"""
+    supabase.table('alert_templates').upsert({
+        'flow_type': flow_type,
+        'template': template,
+        'updated_at': datetime.now().isoformat(),
+    }).execute()

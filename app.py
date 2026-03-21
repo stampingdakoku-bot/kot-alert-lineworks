@@ -772,6 +772,21 @@ def store_delete(store_name):
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     if request.method == 'POST':
+        # アラート文言テンプレート保存
+        template_types = ['clockin_alarm', 'late_clockin', 'clockout_alarm',
+                          'overtime', 'deviation', 'request_reminder', 'morning_check']
+        for ft in template_types:
+            tmpl_val = request.form.get('template_' + ft, '').strip()
+            if tmpl_val:
+                try:
+                    supabase.table('alert_templates').upsert({
+                        'flow_type': ft,
+                        'template': tmpl_val,
+                        'updated_at': datetime.now(JST).isoformat(),
+                    }).execute()
+                except Exception:
+                    pass
+
         updates = {
             'clockin_alarm_enabled': 'clockin_alarm_enabled' in request.form,
             'late_clockin_enabled': 'late_clockin_enabled' in request.form,
@@ -806,7 +821,15 @@ def settings():
     except Exception:
         s = {}
         flash('alert_settingsテーブルが見つかりません。Supabase SQL Editorでテーブルを作成してください。', 'error')
-    return render_template('settings.html', s=s)
+
+    # アラート文言テンプレート取得
+    templates = {}
+    try:
+        tmpl_result = supabase.table('alert_templates').select('*').execute()
+        templates = {r['flow_type']: r['template'] for r in tmpl_result.data}
+    except Exception:
+        pass
+    return render_template('settings.html', s=s, templates=templates)
 
 
 if __name__ == '__main__':

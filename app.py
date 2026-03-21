@@ -772,20 +772,16 @@ def store_delete(store_name):
 @app.route('/settings', methods=['GET', 'POST'])
 def settings():
     if request.method == 'POST':
-        # アラート文言テンプレート保存
+        # アラート文言テンプレート保存（JSONファイル）
+        import db_supabase as _db
+        templates = _db.get_alert_templates()
         template_types = ['clockin_alarm', 'late_clockin', 'clockout_alarm',
                           'overtime', 'deviation', 'request_reminder', 'morning_check']
         for ft in template_types:
             tmpl_val = request.form.get('template_' + ft, '').strip()
             if tmpl_val:
-                try:
-                    supabase.table('alert_templates').upsert({
-                        'flow_type': ft,
-                        'template': tmpl_val,
-                        'updated_at': datetime.now(JST).isoformat(),
-                    }).execute()
-                except Exception:
-                    pass
+                templates[ft] = tmpl_val
+        _db.save_alert_templates(templates)
 
         updates = {
             'clockin_alarm_enabled': 'clockin_alarm_enabled' in request.form,
@@ -822,13 +818,9 @@ def settings():
         s = {}
         flash('alert_settingsテーブルが見つかりません。Supabase SQL Editorでテーブルを作成してください。', 'error')
 
-    # アラート文言テンプレート取得
-    templates = {}
-    try:
-        tmpl_result = supabase.table('alert_templates').select('*').execute()
-        templates = {r['flow_type']: r['template'] for r in tmpl_result.data}
-    except Exception:
-        pass
+    # アラート文言テンプレート取得（JSONファイル）
+    import db_supabase as _db
+    templates = _db.get_alert_templates()
     return render_template('settings.html', s=s, templates=templates)
 
 

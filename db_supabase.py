@@ -182,19 +182,20 @@ def get_alert_settings():
     }
 
 
+ALERT_TEMPLATES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alert_templates.json')
+
 def get_alert_templates():
-    """alert_templatesテーブルからテンプレートを全件取得"""
+    """JSONファイルからアラート文言テンプレートを取得"""
+    import json
     try:
-        result = supabase.table('alert_templates').select('*').execute()
-        return {r['flow_type']: r['template'] for r in result.data}
-    except Exception:
+        with open(ALERT_TEMPLATES_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 
-def save_alert_template(flow_type, template):
-    """alert_templatesテーブルにテンプレートを保存"""
-    supabase.table('alert_templates').upsert({
-        'flow_type': flow_type,
-        'template': template,
-        'updated_at': datetime.now().isoformat(),
-    }).execute()
+def save_alert_templates(templates):
+    """JSONファイルにアラート文言テンプレートを保存"""
+    import json
+    with open(ALERT_TEMPLATES_PATH, 'w', encoding='utf-8') as f:
+        json.dump(templates, f, ensure_ascii=False, indent=2)

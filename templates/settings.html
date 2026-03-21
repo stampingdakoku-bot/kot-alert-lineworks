@@ -126,11 +126,13 @@
                 <strong>日次サマリー</strong>
             </label>
             <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">毎日の勤怠速報を管理者に送信</div>
-            <div style="margin-top:12px;margin-left:28px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <label style="font-size:13px">送信時刻</label>
-                <input type="number" name="daily_summary_hour" value="{{ s.get('daily_summary_hour', 23) }}" min="0" max="23" style="width:50px">
-                <span style="font-size:13px">:</span>
-                <input type="number" name="daily_summary_minute" value="{{ s.get('daily_summary_minute', 0) }}" min="0" max="59" style="width:50px">
+            <div style="margin-top:12px;margin-left:28px">
+                <label style="font-size:13px;display:block;margin-bottom:6px">送信時刻</label>
+                <div style="display:flex;align-items:center;gap:4px">
+                    <input type="number" name="daily_summary_hour" value="{{ s.get('daily_summary_hour', 23) }}" min="0" max="23" style="width:72px;text-align:center;font-size:16px;padding:6px 8px">
+                    <span style="font-size:20px;font-weight:bold;line-height:1;padding:0 2px">:</span>
+                    <input type="number" name="daily_summary_minute" value="{{ s.get('daily_summary_minute', 0) }}" min="0" max="59" style="width:72px;text-align:center;font-size:16px;padding:6px 8px">
+                </div>
             </div>
         </div>
         <div>
@@ -139,11 +141,13 @@
                 <strong>翌朝チェック</strong>
             </label>
             <div style="font-size:12px;color:#999;margin-top:4px;margin-left:28px">前日の申請漏れを翌朝チェック</div>
-            <div style="margin-top:12px;margin-left:28px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <label style="font-size:13px">チェック時刻</label>
-                <input type="number" name="morning_check_hour" value="{{ s.get('morning_check_hour', 10) }}" min="0" max="23" style="width:50px">
-                <span style="font-size:13px">:</span>
-                <input type="number" name="morning_check_minute" value="{{ s.get('morning_check_minute', 10) }}" min="0" max="59" style="width:50px">
+            <div style="margin-top:12px;margin-left:28px">
+                <label style="font-size:13px;display:block;margin-bottom:6px">チェック時刻</label>
+                <div style="display:flex;align-items:center;gap:4px">
+                    <input type="number" name="morning_check_hour" value="{{ s.get('morning_check_hour', 10) }}" min="0" max="23" style="width:72px;text-align:center;font-size:16px;padding:6px 8px">
+                    <span style="font-size:20px;font-weight:bold;line-height:1;padding:0 2px">:</span>
+                    <input type="number" name="morning_check_minute" value="{{ s.get('morning_check_minute', 10) }}" min="0" max="59" style="width:72px;text-align:center;font-size:16px;padding:6px 8px">
+                </div>
             </div>
         </div>
     </div>

@@ -26,6 +26,29 @@
         <button class="btn btn-primary">検索</button>
         <a href="/logs" class="btn" style="background:#95a5a6;color:white">リセット</a>
     </form>
+    <form style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:6px">
+        <label style="font-size:13px;font-weight:bold;white-space:nowrap">未申請者抽出</label>
+        <input type="date" name="unapplied" value="{{ show_unapplied }}" style="flex:0 0 auto">
+        <button class="btn" style="background:#f39c12;color:white">抽出</button>
+        <span style="font-size:12px;color:#888">乖離通知あり・申請リマインドなし</span>
+    </form>
+    {% if unapplied_list %}
+    <div style="margin-bottom:16px;padding:12px;background:#fff3e0;border:1px solid #ffcc80;border-radius:6px">
+        <h3 style="margin:0 0 8px;font-size:14px;color:#e65100">未申請者 ({{ show_unapplied }}) — {{ unapplied_list|length }}名</h3>
+        <table style="width:100%">
+            <thead><tr><th style="width:80px">社員番号</th><th>氏名</th></tr></thead>
+            <tbody>
+            {% for u in unapplied_list %}
+                <tr><td>{{ u.code }}</td><td>{{ u.name }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% elif show_unapplied %}
+    <div style="margin-bottom:16px;padding:12px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:6px;font-size:14px;color:#2e7d32">
+        {{ show_unapplied }} の未申請者はいません
+    </div>
+    {% endif %}
     <div class="table-wrap">
     <table>
         <thead>

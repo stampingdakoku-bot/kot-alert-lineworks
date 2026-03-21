@@ -245,30 +245,36 @@ def _get_store_shifts_and_attendance(today_str):
 
             card['staff_scheduled'].append(staff_info)
 
-            # Check attendance from KoT (divisionNameã§å½è©²åºèã«ãã£ã«ã¿)
+            # Check attendance from KoT (divisionNameで当該店舗にフィルタ)
             if emp_key and emp_key in timerecords:
                 tr = timerecords[emp_key]
                 store_name = store['store_name']
-                store_recs = [r for r in tr.get('records', [])
+                all_recs = tr.get('records', [])
+                store_recs = [r for r in all_recs
                               if store_name in r.get('divisionName', '')]
-                if not store_recs:
-                    store_recs = tr.get('records', [])
+                # フィルタ後0件なら全打刻にフォールバック
+                use_recs = store_recs if store_recs else all_recs
+                # timeRecordのcode/timeからclock_in/clock_outを再計算
                 store_clock_in = None
                 store_clock_out = None
-                for rec in store_recs:
-                    ci = rec.get('clockIn')
-                    co = rec.get('clockOut')
-                    if ci:
-                        ci_dt = datetime.strptime(ci, '%H:%M').replace(tzinfo=JST)
-                        if store_clock_in is None or ci_dt < store_clock_in:
-                            store_clock_in = ci_dt
-                    if co:
-                        co_dt = datetime.strptime(co, '%H:%M').replace(tzinfo=JST)
-                        if store_clock_out is None or co_dt > store_clock_out:
-                            store_clock_out = co_dt
+                for rec in use_recs:
+                    code = str(rec.get('code', ''))
+                    time_str = rec.get('time', '')
+                    if not time_str:
+                        continue
+                    try:
+                        t = _parse_iso(time_str)
+                        if t.tzinfo is None:
+                            t = t.replace(tzinfo=JST)
+                    except (ValueError, TypeError):
+                        continue
+                    if code == '1' and (store_clock_in is None or t < store_clock_in):
+                        store_clock_in = t
+                    elif code == '2' and (store_clock_out is None or t > store_clock_out):
+                        store_clock_out = t
                 if store_clock_in:
-                    clock_in_str = store_clock_in.strftime('%H:%M')
-                    clock_out_str = store_clock_out.strftime('%H:%M') if store_clock_out else None
+                    clock_in_str = store_clock_in.astimezone(JST).strftime('%H:%M')
+                    clock_out_str = store_clock_out.astimezone(JST).strftime('%H:%M') if store_clock_out else None
                     card['staff_clocked_in'].append({
                         **staff_info,
                         'clock_in': clock_in_str,
@@ -439,13 +445,39 @@ def staff_toggle_exclude(employee_key):
 # --- Logs ---
 @app.route('/logs')
 def logs():
-    query = supabase.table('alerts_sent') \
-        .select('*, employees(last_name, first_name)') \
-        .order('created_at', desc=True)
-
     flow_type = request.args.get('flow_type', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
+    show_unapplied = request.args.get('unapplied', '')
+
+    unapplied_list = []
+    if show_unapplied:
+        # 未申請者抽出: 乖離通知ありだが申請リマインドが0件のスタッフ
+        target_date = show_unapplied
+        dev_result = supabase.table('alerts_sent') \
+            .select('employee_key, employees(employee_code, last_name, first_name)') \
+            .eq('alert_date', target_date) \
+            .eq('flow_type', 'deviation') \
+            .execute()
+        rem_result = supabase.table('alerts_sent') \
+            .select('employee_key') \
+            .eq('alert_date', target_date) \
+            .eq('flow_type', 'request_reminder') \
+            .execute()
+        reminded_keys = {r['employee_key'] for r in rem_result.data}
+        for d in dev_result.data:
+            if d['employee_key'] not in reminded_keys:
+                emp = d.get('employees') or {}
+                unapplied_list.append({
+                    'employee_key': d['employee_key'],
+                    'code': emp.get('employee_code', ''),
+                    'name': (emp.get('last_name', '') + ' ' + emp.get('first_name', '')).strip(),
+                    'date': target_date,
+                })
+
+    query = supabase.table('alerts_sent') \
+        .select('*, employees(last_name, first_name)') \
+        .order('created_at', desc=True)
 
     if flow_type:
         query = query.eq('flow_type', flow_type)
@@ -466,7 +498,9 @@ def logs():
                            flow_types=flow_types,
                            filter_flow=flow_type,
                            filter_from=date_from,
-                           filter_to=date_to)
+                           filter_to=date_to,
+                           unapplied_list=unapplied_list,
+                           show_unapplied=show_unapplied)
 
 
 # --- Shifts ---

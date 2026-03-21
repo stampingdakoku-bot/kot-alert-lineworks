@@ -219,8 +219,21 @@ def _get_store_shifts_and_attendance(today_str):
             emp_code = emp.get('employee_code', '') if emp else ''
             full_name = shift_name
 
+            # ç¹°ãè¿ãã¤ãã³ãã§dateTimeãåããªãå ´åãsummaryããæå»ãè§£æ
+            if shift_start_dt is None:
+                time_m = re.match(r'^(\d{1,2})(?::(\d{2}))?\s*[\-ã~]', summary.strip())
+                if time_m:
+                    try:
+                        h = int(time_m.group(1))
+                        m_val = int(time_m.group(2)) if time_m.group(2) else 0
+                        today_date = date.fromisoformat(today_str)
+                        shift_start_dt = datetime(today_date.year, today_date.month, today_date.day,
+                                                  h, m_val, 0, tzinfo=JST)
+                    except (ValueError, TypeError):
+                        pass
+
             now = datetime.now(JST)
-            before_shift = shift_start_dt and now < shift_start_dt
+            before_shift = bool(shift_start_dt and now < shift_start_dt)
 
             staff_info = {
                 'name': full_name,
@@ -232,12 +245,30 @@ def _get_store_shifts_and_attendance(today_str):
 
             card['staff_scheduled'].append(staff_info)
 
-            # Check attendance from KoT
+            # Check attendance from KoT (divisionNameã§å½è©²åºèã«ãã£ã«ã¿)
             if emp_key and emp_key in timerecords:
                 tr = timerecords[emp_key]
-                if tr.get('clock_in'):
-                    clock_in_str = tr['clock_in'].strftime('%H:%M')
-                    clock_out_str = tr['clock_out'].strftime('%H:%M') if tr.get('clock_out') else None
+                store_name = store['store_name']
+                store_recs = [r for r in tr.get('records', [])
+                              if store_name in r.get('divisionName', '')]
+                if not store_recs:
+                    store_recs = tr.get('records', [])
+                store_clock_in = None
+                store_clock_out = None
+                for rec in store_recs:
+                    ci = rec.get('clockIn')
+                    co = rec.get('clockOut')
+                    if ci:
+                        ci_dt = datetime.strptime(ci, '%H:%M').replace(tzinfo=JST)
+                        if store_clock_in is None or ci_dt < store_clock_in:
+                            store_clock_in = ci_dt
+                    if co:
+                        co_dt = datetime.strptime(co, '%H:%M').replace(tzinfo=JST)
+                        if store_clock_out is None or co_dt > store_clock_out:
+                            store_clock_out = co_dt
+                if store_clock_in:
+                    clock_in_str = store_clock_in.strftime('%H:%M')
+                    clock_out_str = store_clock_out.strftime('%H:%M') if store_clock_out else None
                     card['staff_clocked_in'].append({
                         **staff_info,
                         'clock_in': clock_in_str,

@@ -18,6 +18,21 @@ supabase = create_client(
 
 JST = timezone(timedelta(hours=9))
 
+# 異体字正規化マップ（KoT登録名 → カレンダー表記）
+KANJI_VARIANTS = {
+    '𠮷': '吉',  # 𠮷(土吉) → 吉
+    '髙': '高',      # 髙 → 高
+    '濱': '浜',      # 濱 → 浜
+    '晃': '晴',      # 晃 → 晴 (not in use but common)
+    '峵': '崎',      # 峵 → 崎
+    '邉': '辺',      # 邉 → 辺
+    '邊': '辺',      # 邊 → 辺
+}
+
+def _normalize_name(name):
+    """異体字を通常の漢字に正規化"""
+    return ''.join(KANJI_VARIANTS.get(c, c) for c in name)
+
 def _parse_iso(s):
     """Python 3.10互換のISO 8601パーサー（非標準マイクロ秒桁数に対応）"""
     import re
@@ -104,6 +119,12 @@ def _get_store_shifts_and_attendance(today_str):
             name_dups.setdefault(last_name, []).append(e)
             if last_name not in name_map:
                 name_map[last_name] = e
+            # 異体字正規化名でも登録
+            norm_last = _normalize_name(last_name)
+            if norm_last != last_name:
+                name_dups.setdefault(norm_last, []).append(e)
+                if norm_last not in name_map:
+                    name_map[norm_last] = e
         # フルネーム（姓名）でもマッチできるように登録
         if last_name and first_name:
             full = last_name + first_name
@@ -112,6 +133,13 @@ def _get_store_shifts_and_attendance(today_str):
             full_sp = last_name + ' ' + first_name
             if full_sp not in name_map:
                 name_map[full_sp] = e
+            # 正規化フルネーム
+            norm_full = _normalize_name(last_name) + first_name
+            if norm_full not in name_map:
+                name_map[norm_full] = e
+            norm_full_sp = _normalize_name(last_name) + ' ' + first_name
+            if norm_full_sp not in name_map:
+                name_map[norm_full_sp] = e
 
     # LINE WORKS token for calendar API
     token = lw_api.get_access_token()

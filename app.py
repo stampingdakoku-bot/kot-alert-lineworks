@@ -492,31 +492,43 @@ def staff_toggle_exclude(employee_key):
 # --- Logs ---
 @app.route('/logs')
 def logs():
+    import kot_api
     flow_type = request.args.get('flow_type', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
-    show_unapplied = request.args.get('unapplied', '')
 
     unapplied_list = []
-    if show_unapplied:
-        # 未申請者抽出: 乖離通知ありだが申請リマインドが0件のスタッフ
-        target_date = show_unapplied
+    is_unapplied = (flow_type == 'unapplied')
+
+    if is_unapplied:
+        # 未申請者抽出: deviation通知ありでKoT残業申請がないスタッフ
+        target_date = date_from or date.today().isoformat()
         dev_result = supabase.table('alerts_sent') \
             .select('employee_key, employees(employee_code, last_name, first_name)') \
             .eq('alert_date', target_date) \
             .eq('flow_type', 'deviation') \
             .execute()
-        rem_result = supabase.table('alerts_sent') \
-            .select('employee_key') \
-            .eq('alert_date', target_date) \
-            .eq('flow_type', 'request_reminder') \
-            .execute()
-        reminded_keys = {r['employee_key'] for r in rem_result.data}
+        # KoTの残業申請を確認
+        td = datetime.strptime(target_date, '%Y-%m-%d')
+        applied_keys = set()
+        if not kot_api.is_api_blocked():
+            try:
+                ot_data = kot_api.get_overtime_requests(td.year, td.month)
+                if ot_data and 'overtimeRequests' in ot_data:
+                    for req in ot_data['overtimeRequests']:
+                        applied_keys.add(req.get('employeeKey', ''))
+            except Exception:
+                pass
+        seen_keys = set()
         for d in dev_result.data:
-            if d['employee_key'] not in reminded_keys:
+            ek = d['employee_key']
+            if ek in seen_keys:
+                continue
+            seen_keys.add(ek)
+            if ek not in applied_keys:
                 emp = d.get('employees') or {}
                 unapplied_list.append({
-                    'employee_key': d['employee_key'],
+                    'employee_key': ek,
                     'code': emp.get('employee_code', ''),
                     'name': (emp.get('last_name', '') + ' ' + emp.get('first_name', '')).strip(),
                     'date': target_date,
@@ -526,12 +538,16 @@ def logs():
         .select('*, employees(last_name, first_name)') \
         .order('created_at', desc=True)
 
-    if flow_type:
+    if flow_type and not is_unapplied:
         query = query.eq('flow_type', flow_type)
-    if date_from:
-        query = query.gte('alert_date', date_from)
-    if date_to:
-        query = query.lte('alert_date', date_to)
+    if is_unapplied:
+        target_date = date_from or date.today().isoformat()
+        query = query.eq('alert_date', target_date).in_('flow_type', ['deviation', 'request_reminder'])
+    else:
+        if date_from:
+            query = query.gte('alert_date', date_from)
+        if date_to:
+            query = query.lte('alert_date', date_to)
 
     result = query.limit(100).execute()
 
@@ -547,7 +563,7 @@ def logs():
                            filter_from=date_from,
                            filter_to=date_to,
                            unapplied_list=unapplied_list,
-                           show_unapplied=show_unapplied)
+                           is_unapplied=is_unapplied)
 
 
 @app.route('/logs/reset', methods=['POST'])

@@ -14,7 +14,10 @@
 </div>
 {% endif %}
 
-<h2 style="margin-bottom:16px">ダッシュボード — {{ today[5:].replace('-', '/') }}</h2>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="margin:0">ダッシュボード — {{ today[5:].replace('-', '/') }}</h2>
+    <span id="lastUpdate" style="font-size:12px;color:#999"></span>
+</div>
 
 {# ===== 店舗カード グリッド ===== #}
 <div class="store-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
@@ -76,7 +79,7 @@
                 {% endfor %}
                 {% set is_not_clocked = staff.emp_key and staff.emp_key in (card.staff_not_clocked | map(attribute='emp_key') | list) %}
                 <tr>
-                    <td style="text-align:center;font-size:16px">
+                    <td style="text-align:center;font-size:22px">
                         {% if is_in %}
                             <span style="color:#27ae60" title="出勤済">●</span>
                         {% elif is_not_clocked %}
@@ -238,5 +241,20 @@
     .problem-grid { grid-template-columns: 1fr !important; }
 }
 </style>
+
+
+<script>
+(function() {
+    // 最終更新時刻表示
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, '0');
+    var mm = String(now.getMinutes()).padStart(2, '0');
+    var ss = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('lastUpdate').textContent = '最終更新 ' + hh + ':' + mm + ':' + ss;
+
+    // 60秒ごとにリロード
+    setTimeout(function() { location.reload(); }, 60000);
+})();
+</script>
 
 {% endblock %}

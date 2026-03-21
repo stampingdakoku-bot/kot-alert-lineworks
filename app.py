@@ -400,7 +400,26 @@ def staff_list():
         .select('*, mappings(lw_account_id)') \
         .order('employee_code') \
         .execute()
-    return render_template('staff.html', employees=employees.data)
+
+    # 異体字警告検出
+    variant_warnings = []
+    for e in employees.data:
+        ln = e.get('last_name', '') or ''
+        fn = e.get('first_name', '') or ''
+        norm_ln = _normalize_name(ln)
+        norm_fn = _normalize_name(fn)
+        if norm_ln != ln or norm_fn != fn:
+            original = ln + fn
+            normalized = norm_ln + norm_fn
+            variant_warnings.append({
+                'code': e.get('employee_code', ''),
+                'name': ln + ' ' + fn,
+                'normalized': norm_ln + ' ' + norm_fn,
+            })
+
+    return render_template('staff.html',
+                           employees=employees.data,
+                           variant_warnings=variant_warnings)
 
 
 @app.route('/staff/add', methods=['POST'])
@@ -530,6 +549,27 @@ def logs():
                            unapplied_list=unapplied_list,
                            show_unapplied=show_unapplied)
 
+
+@app.route('/logs/reset', methods=['POST'])
+def logs_reset():
+    reset_date = request.form.get('reset_date', '')
+    employee_key = request.form.get('employee_key', '').strip()
+    flow_type = request.form.get('flow_type', '').strip()
+
+    if not reset_date:
+        flash('日付を指定してください', 'error')
+        return redirect(url_for('logs'))
+
+    query = supabase.table('alerts_sent').delete().eq('alert_date', reset_date)
+    if employee_key:
+        query = query.eq('employee_key', employee_key)
+    if flow_type:
+        query = query.eq('flow_type', flow_type)
+    result = query.execute()
+
+    count = len(result.data) if result.data else 0
+    flash(f'{reset_date} の通知履歴を {count} 件削除しました', 'success')
+    return redirect(url_for('logs'))
 
 # --- Shifts ---
 @app.route('/shifts')

@@ -49,6 +49,9 @@
         {{ show_unapplied }} の未申請者はいません
     </div>
     {% endif %}
+    <div style="margin-bottom:12px;text-align:right">
+        <button class="btn" style="background:#e74c3c;color:white" onclick="document.getElementById('resetModal').style.display='block'">通知リセット</button>
+    </div>
     <div class="table-wrap">
     <table>
         <thead>
@@ -78,4 +81,51 @@
     .log-filter select, .log-filter input, .log-filter .btn, .log-filter a { width: 100%; text-align: center; }
 }
 </style>
+
+<!-- Reset Modal -->
+<div id="resetModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:white;border-radius:8px;padding:24px;max-width:400px;margin:80px auto;box-shadow:0 4px 24px rgba(0,0,0,0.2)">
+        <h3 style="margin:0 0 16px;font-size:16px">通知履歴リセット</h3>
+        <form method="POST" action="/logs/reset" id="resetForm" onsubmit="return confirmReset()">
+            <div style="margin-bottom:12px">
+                <label style="font-size:13px;display:block;margin-bottom:4px">対象日付</label>
+                <input type="date" name="reset_date" required style="width:100%">
+            </div>
+            <div style="margin-bottom:12px">
+                <label style="font-size:13px;display:block;margin-bottom:4px">スタッフ (空欄で全員)</label>
+                <input type="text" name="employee_key" placeholder="employee_key (任意)" style="width:100%;font-size:12px">
+            </div>
+            <div style="margin-bottom:16px">
+                <label style="font-size:13px;display:block;margin-bottom:4px">通知種別 (空欄で全種別)</label>
+                <select name="flow_type" style="width:100%">
+                    <option value="">全種別</option>
+                    <option value="clockin_alarm">出勤アラーム</option>
+                    <option value="clockout_alarm">退勤アラーム</option>
+                    <option value="late_clockin">出勤打刻なし</option>
+                    <option value="overtime">超過警告</option>
+                    <option value="deviation">乖離通知</option>
+                    <option value="request_reminder">申請リマインド</option>
+                    <option value="morning_check">翌朝チェック</option>
+                </select>
+            </div>
+            <div style="text-align:right">
+                <button type="button" class="btn" onclick="document.getElementById('resetModal').style.display='none'">キャンセル</button>
+                <button type="submit" class="btn btn-danger">削除実行</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function confirmReset() {
+    var d = document.querySelector('#resetForm [name=reset_date]').value;
+    var ek = document.querySelector('#resetForm [name=employee_key]').value;
+    var ft = document.querySelector('#resetForm [name=flow_type]').value;
+    var msg = d + ' の通知履歴を削除します。';
+    if (ek) msg += '\nスタッフ: ' + ek;
+    if (ft) msg += '\n種別: ' + ft;
+    msg += '\n\nこの操作は取り消せません。実行しますか？';
+    return confirm(msg);
+}
+</script>
+
 {% endblock %}

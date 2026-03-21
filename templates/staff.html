@@ -1,6 +1,25 @@
 {% extends 'base.html' %}
 {% block title %}スタッフ管理{% endblock %}
 {% block content %}
+{% if variant_warnings %}
+<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:12px 16px;margin-bottom:16px">
+    <strong style="color:#e65100;font-size:14px">異体字不一致の可能性</strong>
+    <div style="font-size:12px;color:#888;margin-bottom:8px">カレンダーで通常漢字が使われている場合、自動正規化でマッチしますが確認を推奨します</div>
+    <table style="width:100%;font-size:13px">
+        <thead><tr><th style="width:70px">コード</th><th>DB登録名</th><th>正規化後</th></tr></thead>
+        <tbody>
+        {% for w in variant_warnings %}
+        <tr>
+            <td>{{ w.code }}</td>
+            <td>{{ w.name }}</td>
+            <td>{{ w.normalized }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 <div class="card">
     <h2>スタッフ一覧</h2>
     <div style="margin-bottom:16px">

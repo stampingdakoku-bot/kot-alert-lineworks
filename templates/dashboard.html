@@ -20,8 +20,22 @@
 <div class="store-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     {% for card in store_cards %}
     <div class="card" style="padding:20px">
+        {% set n_scheduled = card.staff_scheduled|length %}
+        {% set n_clocked = card.staff_clocked_in|length %}
+        {% if n_clocked == n_scheduled and n_scheduled > 0 %}
+            {% set badge_bg = '#27ae60' %}
+        {% elif n_clocked > 0 %}
+            {% set badge_bg = '#f39c12' %}
+        {% else %}
+            {% set badge_bg = '#95a5a6' %}
+        {% endif %}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <h2 style="margin:0;font-size:18px">{{ card.store_name }}</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+                <h2 style="margin:0;font-size:18px">{{ card.store_name }}</h2>
+                {% if n_scheduled > 0 %}
+                <span style="font-size:12px;color:white;background:{{ badge_bg }};padding:2px 10px;border-radius:12px;white-space:nowrap">出勤中 {{ n_clocked }}/{{ n_scheduled }}名</span>
+                {% endif %}
+            </div>
             <span style="font-size:13px;color:#666">閉店 {{ card.closing_hour }}:00</span>
         </div>
 

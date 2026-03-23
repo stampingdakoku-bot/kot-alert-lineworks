@@ -27,6 +27,7 @@ KANJI_VARIANTS = {
     '峵': '崎',      # 峵 → 崎
     '邉': '辺',      # 邉 → 辺
     '邊': '辺',      # 邊 → 辺
+    '瀨': '瀬',      # 瀨 → 瀬
 }
 
 def _normalize_name(name):

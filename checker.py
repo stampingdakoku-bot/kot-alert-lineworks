@@ -352,72 +352,79 @@ def main():
                 alert_count = db.count_alerts_today(emp_key, "overtime", today_str)
                 if alert_count >= MAX_OVERTIME_ALERTS:
                     logger.debug("%s %s: 超過警告上限到達", emp_code, emp_name)
-                    continue
+                else:
+                    round_num = alert_count + 1
+                    tmpl = alert_templates.get('overtime',
+                        '⚠️ まだ退勤打刻がありません。\nKOT打刻申請から申請してください。\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請')
+                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                          count=str(round_num), clock_out='', diff='')
 
-                round_num = alert_count + 1
-                tmpl = alert_templates.get('overtime',
-                    '⚠️ 退勤打刻の確認（{count}回目）\nシフト終了時刻（{shift_end}）を過ぎましたが、退勤打刻が確認できません。\n打刻漏れはないですか？\n確認をお願いします。')
-                message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
-                                      count=str(round_num), clock_out='', diff='')
+                    if lw_api.send_message(lw_id, message):
+                        db.record_alert(emp_key, "overtime", today_str, message)
+                        overtime_notified += 1
+                        logger.info("超過警告(%d回目): %s %s (%s, シフト終了%s)",
+                                    round_num, emp_code, emp_name, store_name, shift_end_str)
 
-                if lw_api.send_message(lw_id, message):
-                    db.record_alert(emp_key, "overtime", today_str, message)
-                    overtime_notified += 1
-                    logger.info("超過警告(%d回目): %s %s (%s, シフト終了%s)",
-                                round_num, emp_code, emp_name, store_name, shift_end_str)
-
-            else:
-                # === 退勤打刻あり ===
-                overtime_count = db.count_alerts_today(emp_key, "overtime", today_str)
-                if overtime_count == 0:
-                    continue
-
+            elif has_clock_out:
+                # === 退勤打刻あり: 乖離通知（従来どおり） ===
                 diff_minutes = int((tr["clock_out"] - shift_end).total_seconds() / 60)
                 clock_out_str = tr["clock_out"].strftime("%H:%M")
 
-                if abs(diff_minutes) <= 1:
-                    continue
+                if diff_minutes > 1 and not has_request_for_today(emp_key, tr_requests):
+                    if settings.get('deviation_enabled', True) and not db.was_alert_sent(emp_key, "deviation", today_str):
+                        tmpl = alert_templates.get('deviation',
+                            '📋 勤務時間のお知らせ\nシフト終了: {shift_end}\n退勤打刻: {clock_out}（{diff}分超過）\n修正申請がまだ提出されていません。\nお早めに申請をお願いします。')
+                        message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                              count='', clock_out=clock_out_str, diff=str(diff_minutes))
 
-                if diff_minutes > 0:
-                    diff_str = str(diff_minutes) + "分超過"
-                else:
-                    diff_str = str(abs(diff_minutes)) + "分早退"
+                        if lw_api.send_message(lw_id, message):
+                            db.record_alert(emp_key, "deviation", today_str, message)
+                            deviation_notified += 1
+                            logger.info("乖離通知: %s %s (%s, シフト%s, 退勤%s)",
+                                        emp_code, emp_name, store_name, shift_end_str, clock_out_str)
 
-                # 申請済みチェック
-                if has_request_for_today(emp_key, tr_requests):
-                    logger.info("%s %s: 申請済み、通知スキップ", emp_code, emp_name)
-                    continue
+            # === 申請リマインド（新ロジック） ===
+            # パターンA: 退勤打刻なし＆overtime開始分数経過
+            # パターンB: 退勤打刻あり＆15分以上超過
+            if settings.get('request_reminder_enabled', True):
+                overtime_start_min = settings.get('overtime_start_minutes', 10)
+                reminder_interval = settings.get('request_reminder_interval_minutes', 10)
+                send_reminder = False
 
-                # === 乖離通知 ===
-                if settings.get('deviation_enabled', True) and not db.was_alert_sent(emp_key, "deviation", today_str):
-                    tmpl = alert_templates.get('deviation',
-                        '📋 勤務時間のお知らせ\nシフト終了: {shift_end}\n退勤打刻: {clock_out}（{diff}分超過）\n修正申請がまだ提出されていません。\nお早めに申請をお願いします。')
-                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
-                                          count='', clock_out=clock_out_str, diff=str(diff_minutes))
+                if not has_clock_out and now >= shift_end + timedelta(minutes=overtime_start_min):
+                    # パターンA: 退勤打刻なし
+                    if not has_request_for_today(emp_key, tr_requests):
+                        send_reminder = True
+                elif has_clock_out:
+                    # パターンB: 退勤打刻あり＆15分以上超過
+                    diff_min = int((tr["clock_out"] - shift_end).total_seconds() / 60)
+                    if diff_min >= 15 and not has_request_for_today(emp_key, tr_requests):
+                        send_reminder = True
 
-                    if lw_api.send_message(lw_id, message):
-                        db.record_alert(emp_key, "deviation", today_str, message)
-                        deviation_notified += 1
-                        logger.info("乖離通知: %s %s (%s, シフト%s, 退勤%s)",
-                                    emp_code, emp_name, store_name, shift_end_str, clock_out_str)
-
-                # === 申請リマインド ===
-                elif settings.get('request_reminder_enabled', True) and db.was_alert_sent(emp_key, "deviation", today_str):
+                if send_reminder:
                     reminder_count = db.count_alerts_today(emp_key, "request_reminder", today_str)
-                    if reminder_count >= MAX_REQUEST_REMINDERS:
-                        continue
+                    if reminder_count < MAX_REQUEST_REMINDERS:
+                        # overtimeアラートとの重複防止: 最終overtime送信から設定間隔分後まで待つ
+                        last_overtime = db.get_last_alert_time(emp_key, "overtime", today_str)
+                        if last_overtime and (now - last_overtime).total_seconds() < reminder_interval * 60:
+                            logger.debug("%s %s: overtime送信直後のためリマインドスキップ", emp_code, emp_name)
+                        else:
+                            # 前回のrequest_reminderからも間隔を空ける
+                            last_reminder = db.get_last_alert_time(emp_key, "request_reminder", today_str)
+                            if last_reminder and (now - last_reminder).total_seconds() < reminder_interval * 60:
+                                logger.debug("%s %s: リマインド間隔未到達", emp_code, emp_name)
+                            else:
+                                round_num = reminder_count + 1
+                                tmpl = alert_templates.get('request_reminder',
+                                    '📋 打刻申請がまだ完了していません。\nKOTから申請をお願いします。\nタイムカード → 該当日の詳細 → 打刻申請 → 新規（または編集） → 申請メッセージ入力 → 申請')
+                                message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
+                                                      count=str(round_num), clock_out='', diff='')
 
-                    round_num = reminder_count + 1
-                    tmpl = alert_templates.get('request_reminder',
-                        '📋 申請リマインド（{count}回目）\nシフト終了: {shift_end}\n退勤打刻: {clock_out}（{diff}分超過）\n修正申請がまだ提出されていません。\nお早めに申請をお願いします。')
-                    message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
-                                          count=str(round_num), clock_out=clock_out_str, diff=str(diff_minutes))
-
-                    if lw_api.send_message(lw_id, message):
-                        db.record_alert(emp_key, "request_reminder", today_str, message)
-                        reminder_notified += 1
-                        logger.info("申請リマインド(%d回目): %s %s (%s)",
-                                    round_num, emp_code, emp_name, store_name)
+                                if lw_api.send_message(lw_id, message):
+                                    db.record_alert(emp_key, "request_reminder", today_str, message)
+                                    reminder_notified += 1
+                                    logger.info("申請リマインド(%d回目): %s %s (%s)",
+                                                round_num, emp_code, emp_name, store_name)
 
     logger.info("出勤アラーム: %d名, 退勤アラーム: %d名, 出勤なし: %d名, 超過: %d名, 乖離: %d名, リマインド: %d名",
                 clockin_alarm_sent, clockout_alarm_sent, late_clockin_notified,

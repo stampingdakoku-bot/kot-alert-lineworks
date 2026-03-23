@@ -45,6 +45,21 @@ def count_alerts_today(employee_key, flow_type, alert_date):
     return result.count if result.count is not None else len(result.data)
 
 
+def get_last_alert_time(employee_key, flow_type, alert_date):
+    """指定flow_typeの最終送信時刻を返す（datetime or None）"""
+    result = supabase.table('alerts_sent') \
+        .select('sent_at') \
+        .eq('employee_key', employee_key) \
+        .eq('flow_type', flow_type) \
+        .eq('alert_date', alert_date) \
+        .order('sent_at', desc=True) \
+        .limit(1) \
+        .execute()
+    if result.data:
+        return datetime.fromisoformat(result.data[0]['sent_at'])
+    return None
+
+
 def get_reminder_tracking(employee_key, alert_date):
     result = supabase.table('reminder_tracking') \
         .select('*') \

@@ -267,7 +267,7 @@ def main():
                         '🔔 出勤時間になりました（{shift_start}）\n打刻をお願いします。')
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count='', clock_out='', diff='')
-                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
+                    if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "clockin_alarm", today_str, message)
                         clockin_alarm_sent += 1
                         logger.info("出勤アラーム: %s %s (%s, %s)",
@@ -281,7 +281,7 @@ def main():
                         '🔔 お疲れさまでした。\n退勤時間になりました（{shift_end}）\n打刻して速やかにお帰りください。')
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count='', clock_out='', diff='')
-                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
+                    if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "clockout_alarm", today_str, message)
                         clockout_alarm_sent += 1
                         logger.info("退勤アラーム: %s %s (%s, %s)",
@@ -333,7 +333,7 @@ def main():
                         '⚠️ 出勤打刻の確認（{count}回目）\nシフト開始時刻（{shift_start}）を過ぎましたが、出勤打刻が確認できません。\n打刻漏れはないですか？\n確認をお願いします。')
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count=str(round_num), clock_out='', diff='')
-                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
+                    if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "late_clockin", today_str, message)
                         late_clockin_notified += 1
                         logger.info("出勤打刻なし(%d回目): %s %s (%s, シフト開始%s)",
@@ -362,7 +362,7 @@ def main():
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count=str(round_num), clock_out='', diff='')
 
-                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
+                    if lw_api.send_message(lw_id, message):
                         db.record_alert(emp_key, "overtime", today_str, message)
                         overtime_notified += 1
                         logger.info("超過警告(%d回目): %s %s (%s, シフト終了%s)",
@@ -380,7 +380,7 @@ def main():
                         message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                               count='', clock_out=clock_out_str, diff=str(diff_minutes))
 
-                        if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
+                        if lw_api.send_message(lw_id, message):
                             db.record_alert(emp_key, "deviation", today_str, message)
                             deviation_notified += 1
                             logger.info("乖離通知: %s %s (%s, シフト%s, 退勤%s)",
@@ -423,7 +423,7 @@ def main():
                                 message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                                       count=str(round_num), clock_out='', diff='')
 
-                                if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
+                                if lw_api.send_message(lw_id, message):
                                     db.record_alert(emp_key, "request_reminder", today_str, message)
                                     reminder_notified += 1
                                     logger.info("申請リマインド(%d回目): %s %s (%s)",

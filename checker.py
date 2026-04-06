@@ -480,7 +480,7 @@ def send_daily_report(all_emps=None, yesterday_str=None):
     # KOT APIから前日の退勤打刻時刻を取得
     clockout_map = {}
     try:
-        daily_data = kot_api.get_daily_workings(yesterday_str)
+        daily_data = kot_api.get_timerecords(yesterday_str)
         workings = []
         if isinstance(daily_data, dict):
             workings = daily_data.get("dailyWorkings", [])

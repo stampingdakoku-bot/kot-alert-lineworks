@@ -324,11 +324,27 @@ def _get_store_shifts_and_attendance(today_str):
 # --- Dashboard ---
 @app.route('/')
 def dashboard():
-    today = date.today().isoformat()
+    today_actual = date.today().isoformat()
+    date_param = (request.args.get('date') or '').strip()
+    try:
+        if date_param:
+            selected = date.fromisoformat(date_param)
+        else:
+            selected = date.today()
+    except ValueError:
+        selected = date.today()
+    # 未来日は今日に丸める
+    if selected > date.today():
+        selected = date.today()
+    today = selected.isoformat()
+    is_past = today < today_actual
+    is_today = today == today_actual
+    prev_date = (selected - timedelta(days=1)).isoformat()
+    next_date = (selected + timedelta(days=1)).isoformat()
 
-    # Today's alerts with employee info
+    # 選択日のアラート（従業員情報付き）
     alerts_today = supabase.table('alerts_sent') \
-        .select('*, employees(employee_code, last_name, first_name)') \
+        .select('*, employees(employee_code, last_name, first_name, division_name)') \
         .eq('alert_date', today) \
         .order('created_at', desc=True) \
         .execute()
@@ -383,8 +399,44 @@ def dashboard():
                 problem_overtime[key] = {'name': name, 'code': code, 'count': 0}
             problem_overtime[key]['count'] += 1
 
+    # 過去日表示時はアラート履歴を生成（時刻昇順）
+    alert_history = []
+    if is_past:
+        for a in alerts_today.data:
+            ek = a.get('employee_key', '')
+            if ek == '__admin__':
+                continue
+            emp = a.get('employees') or {}
+            name = (emp.get('last_name', '') + emp.get('first_name', '')).strip() or '?'
+            store = emp.get('division_name', '') or ''
+            ft = a['flow_type']
+            time_str = ''
+            raw_ts = a.get('sent_at') or a.get('created_at') or ''
+            if raw_ts:
+                try:
+                    dt = _parse_iso(raw_ts)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    time_str = dt.astimezone(JST).strftime('%H:%M')
+                except (ValueError, TypeError):
+                    pass
+            alert_history.append({
+                'time': time_str,
+                'name': name,
+                'store': store,
+                'label': FLOW_LABELS.get(ft, ft),
+                'flow_type': ft,
+            })
+        alert_history.sort(key=lambda x: x['time'])
+
     return render_template('dashboard.html',
                            today=today,
+                           today_actual=today_actual,
+                           is_past=is_past,
+                           is_today=is_today,
+                           prev_date=prev_date,
+                           next_date=next_date,
+                           alert_history=alert_history,
                            summary=summary,
                            total_today=len(alerts_today.data),
                            recent=recent.data,

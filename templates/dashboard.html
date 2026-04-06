@@ -14,9 +14,23 @@
 </div>
 {% endif %}
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <h2 style="margin:0">ダッシュボード — {{ today[5:].replace('-', '/') }}</h2>
-    <span id="lastUpdate" style="font-size:12px;color:#999"></span>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <h2 style="margin:0">ダッシュボード — {{ today[5:].replace('-', '/') }}</h2>
+        {% if is_past %}
+        <span style="background:#f39c12;color:white;font-size:11px;padding:3px 8px;border-radius:10px">過去データ表示中</span>
+        {% endif %}
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <a href="?date={{ prev_date }}" style="padding:6px 12px;background:#ecf0f1;color:#333;text-decoration:none;border-radius:4px;font-size:13px">◀ 前日</a>
+        <input type="date" id="dateNav" value="{{ today }}" max="{{ today_actual }}" style="padding:5px 8px;font-size:13px;border:1px solid #ccc;border-radius:4px">
+        {% if is_today %}
+        <span style="padding:6px 12px;background:#f5f5f5;color:#bbb;border-radius:4px;font-size:13px;cursor:not-allowed">翌日 ▶</span>
+        {% else %}
+        <a href="?date={{ next_date }}" style="padding:6px 12px;background:#ecf0f1;color:#333;text-decoration:none;border-radius:4px;font-size:13px">翌日 ▶</a>
+        {% endif %}
+        <span id="lastUpdate" style="font-size:12px;color:#999;margin-left:8px"></span>
+    </div>
 </div>
 
 {# ===== 店舗カード グリッド ===== #}
@@ -134,6 +148,35 @@
     {% endif %}
 </div>
 
+{# ===== 過去日のアラート履歴 ===== #}
+{% if is_past %}
+<div class="card" style="margin-bottom:16px">
+    <h2>📋 {{ today }} のアラート履歴</h2>
+    {% if alert_history %}
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th style="width:60px">時刻</th><th>スタッフ</th><th>店舗</th><th>種別</th></tr></thead>
+        <tbody>
+            {% for h in alert_history %}
+            <tr>
+                <td style="font-size:13px;white-space:nowrap">{{ h.time }}</td>
+                <td style="font-size:13px">{{ h.name }}</td>
+                <td style="font-size:12px;color:#666">{{ h.store }}</td>
+                <td>
+                    {% set is_warn = h.flow_type in ('late_clockin', 'overtime', 'deviation') %}
+                    <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white;white-space:nowrap">{{ h.label }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;color:#999;padding:24px 0;font-size:14px">この日のアラートはありません</div>
+    {% endif %}
+</div>
+{% endif %}
+
 {# ===== 通知サマリー + 最近の通知 ===== #}
 <div class="summary-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
 
@@ -245,15 +288,29 @@
 
 <script>
 (function() {
+    // 日付ナビゲーション（input type=date 変更で遷移）
+    var dateNav = document.getElementById('dateNav');
+    if (dateNav) {
+        dateNav.addEventListener('change', function() {
+            if (this.value) {
+                window.location.href = '?date=' + this.value;
+            }
+        });
+    }
+
     // 最終更新時刻表示
     var now = new Date();
     var hh = String(now.getHours()).padStart(2, '0');
     var mm = String(now.getMinutes()).padStart(2, '0');
     var ss = String(now.getSeconds()).padStart(2, '0');
-    document.getElementById('lastUpdate').textContent = '最終更新 ' + hh + ':' + mm + ':' + ss;
+    var lu = document.getElementById('lastUpdate');
+    if (lu) lu.textContent = '最終更新 ' + hh + ':' + mm + ':' + ss;
 
-    // 60秒ごとにリロード
-    setTimeout(function() { location.reload(); }, 60000);
+    // 当日表示時のみ60秒ごとにリロード
+    var isToday = {{ 'true' if is_today else 'false' }};
+    if (isToday) {
+        setTimeout(function() { location.reload(); }, 60000);
+    }
 })();
 </script>
 

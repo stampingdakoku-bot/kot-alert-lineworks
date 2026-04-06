@@ -30,7 +30,10 @@ from config import LOG_PATH, LW_DOMAIN_ID
 import db_supabase as db
 import kot_api
 import lw_api
+from lw_api import send_message, send_group_message
 import requests
+
+LW_GROUP_CHANNEL_ID = os.environ.get('LW_GROUP_CHANNEL_ID', '')
 
 # --- ロギング設定 ---
 os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
@@ -264,7 +267,7 @@ def main():
                         '🔔 出勤時間になりました（{shift_start}）\n打刻をお願いします。')
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count='', clock_out='', diff='')
-                    if lw_api.send_message(lw_id, message):
+                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
                         db.record_alert(emp_key, "clockin_alarm", today_str, message)
                         clockin_alarm_sent += 1
                         logger.info("出勤アラーム: %s %s (%s, %s)",
@@ -278,7 +281,7 @@ def main():
                         '🔔 お疲れさまでした。\n退勤時間になりました（{shift_end}）\n打刻して速やかにお帰りください。')
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count='', clock_out='', diff='')
-                    if lw_api.send_message(lw_id, message):
+                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
                         db.record_alert(emp_key, "clockout_alarm", today_str, message)
                         clockout_alarm_sent += 1
                         logger.info("退勤アラーム: %s %s (%s, %s)",
@@ -330,7 +333,7 @@ def main():
                         '⚠️ 出勤打刻の確認（{count}回目）\nシフト開始時刻（{shift_start}）を過ぎましたが、出勤打刻が確認できません。\n打刻漏れはないですか？\n確認をお願いします。')
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count=str(round_num), clock_out='', diff='')
-                    if lw_api.send_message(lw_id, message):
+                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
                         db.record_alert(emp_key, "late_clockin", today_str, message)
                         late_clockin_notified += 1
                         logger.info("出勤打刻なし(%d回目): %s %s (%s, シフト開始%s)",
@@ -359,7 +362,7 @@ def main():
                     message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                           count=str(round_num), clock_out='', diff='')
 
-                    if lw_api.send_message(lw_id, message):
+                    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
                         db.record_alert(emp_key, "overtime", today_str, message)
                         overtime_notified += 1
                         logger.info("超過警告(%d回目): %s %s (%s, シフト終了%s)",
@@ -377,7 +380,7 @@ def main():
                         message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                               count='', clock_out=clock_out_str, diff=str(diff_minutes))
 
-                        if lw_api.send_message(lw_id, message):
+                        if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
                             db.record_alert(emp_key, "deviation", today_str, message)
                             deviation_notified += 1
                             logger.info("乖離通知: %s %s (%s, シフト%s, 退勤%s)",
@@ -420,7 +423,7 @@ def main():
                                 message = tmpl.format(shift_start=shift_start_str, shift_end=shift_end_str,
                                                       count=str(round_num), clock_out='', diff='')
 
-                                if lw_api.send_message(lw_id, message):
+                                if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
                                     db.record_alert(emp_key, "request_reminder", today_str, message)
                                     reminder_notified += 1
                                     logger.info("申請リマインド(%d回目): %s %s (%s)",
@@ -431,25 +434,109 @@ def main():
                 overtime_notified, deviation_notified, reminder_notified)
 
     # ========================================
-    # 23:00 速報（打刻ベースのみ、申請情報なし）
+    # 13:10 前日勤怠まとめ（グループ送信）
     # ========================================
-    if settings.get('daily_summary_enabled', True) and now.hour == settings.get('daily_summary_hour', 23):
-        send_nightly_report(today_str, all_emps, ADMIN_LW_ID)
-
-    # ========================================
-    # 10:10 翌朝申請漏れチェック（前日分）
-    # ========================================
-    mc_hour = settings.get('morning_check_hour', 10)
-    mc_min = settings.get('morning_check_minute', 10)
-    if settings.get('morning_check_enabled', True) and now.hour == mc_hour and mc_min <= now.minute < mc_min + 10:
-        yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-        send_morning_request_check(yesterday, all_emps, ADMIN_LW_ID)
+    report_hour = 13
+    report_minute = 10
+    if now.hour == report_hour and report_minute <= now.minute < report_minute + 10:
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        if not db.was_alert_sent("__admin__", "morning_check", yesterday_str):
+            send_daily_report(all_emps, yesterday_str)
 
     logger.info("=" * 50)
 
 
 # 管理者LW ID
 ADMIN_LW_ID = "sakamoto.tatsuya@avivastarscorporation"
+
+
+def send_daily_report(all_emps=None, yesterday_str=None):
+    """前日の勤怠まとめを13:10にグループ送信する"""
+    if yesterday_str is None:
+        yesterday_str = (datetime.now(JST) - timedelta(days=1)).strftime("%Y-%m-%d")
+    if all_emps is None:
+        all_emps = {e["employee_key"]: e for e in db.get_all_employees()}
+
+    # 前日のアラート集計
+    result = db.supabase.table('alerts_sent').select('employee_key, flow_type') \
+        .eq('alert_date', yesterday_str).execute()
+
+    counts = {}
+    problem_names = {}
+    for row in result.data:
+        ft = row["flow_type"]
+        ek = row["employee_key"]
+        if ek == "__admin__":
+            continue
+        # 重複排除（同一人物が複数回アラートされた場合）
+        key = (ft, ek)
+        if ft not in problem_names:
+            problem_names[ft] = set()
+        if ek in problem_names[ft]:
+            continue
+        problem_names[ft].add(ek)
+        counts[ft] = counts.get(ft, 0) + 1
+
+    def _names(ft):
+        eks = problem_names.get(ft, set())
+        names = []
+        for ek in eks:
+            emp = all_emps.get(ek, {})
+            nm = (emp.get("last_name", "") + emp.get("first_name", "")).strip() or "?"
+            names.append(nm)
+        return "、".join(sorted(names))
+
+    lines = ["📊 前日勤怠まとめ（" + yesterday_str + "）", ""]
+
+    flow_labels = [
+        ("late_clockin", "出勤打刻なし"),
+        ("overtime", "超過警告"),
+        ("deviation", "乖離通知"),
+    ]
+    for ft, label in flow_labels:
+        cnt = counts.get(ft, 0)
+        if cnt > 0:
+            lines.append(label + ": " + str(cnt) + "件（" + _names(ft) + "）")
+        else:
+            lines.append(label + ": 0件")
+
+    # 申請漏れ情報（deviation対象者のKOT打刻修正申請有無）
+    lines.append("")
+    deviation_eks = list(problem_names.get("deviation", set()))
+    if deviation_eks:
+        tr_requests = get_timerecord_requests(yesterday_str)
+        no_request = []
+        has_request = []
+        for ek in deviation_eks:
+            emp = all_emps.get(ek, {})
+            nm = (emp.get("last_name", "") + emp.get("first_name", "")).strip() or "?"
+            if has_request_for_today(ek, tr_requests):
+                has_request.append(nm)
+            else:
+                no_request.append(nm)
+        if no_request:
+            lines.append("❌ 申請漏れ: " + "、".join(sorted(no_request)))
+        if has_request:
+            lines.append("✅ 申請済: " + "、".join(sorted(has_request)))
+        if not no_request:
+            lines.append("全員申請済みです。")
+    else:
+        lines.append("シフト超過者なし。申請チェック不要です。")
+
+    lines.append("")
+    lines.append("⚙️ 申請漏れがある場合はKING OF TIMEより修正を行ってください。")
+    lines.append("")
+    lines.append("▶ 管理画面")
+    lines.append("http://133.125.93.39/")
+
+    message = "\n".join(lines)
+    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
+        # flow_typeは既存check制約に合わせて morning_check を流用
+        db.record_alert("__admin__", "morning_check", yesterday_str, message)
+        logger.info("前日勤怠まとめ送信完了")
+    else:
+        logger.error("前日勤怠まとめ送信失敗")
+    return message
 
 
 def send_nightly_report(today_str, all_emps, admin_lw_id=None):
@@ -500,7 +587,7 @@ def send_nightly_report(today_str, all_emps, admin_lw_id=None):
 
     message = "\n".join(lines)
     _admin = admin_lw_id or ADMIN_LW_ID
-    if lw_api.send_message(_admin, message):
+    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
         logger.info("速報送信完了")
     else:
         logger.error("速報送信失敗")
@@ -533,7 +620,7 @@ def send_morning_request_check(yesterday_str, all_emps, admin_lw_id=None):
             + "シフト超過者なし。申請チェック不要です。"
         )
         _admin = admin_lw_id or ADMIN_LW_ID
-        lw_api.send_message(_admin, message)
+        lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message)
         # 送信済み記録
         db.record_alert("__admin__", "morning_check", yesterday_str, "no_deviation")
         logger.info("翌朝チェック送信（超過者なし）")
@@ -564,7 +651,7 @@ def send_morning_request_check(yesterday_str, all_emps, admin_lw_id=None):
 
     message = "\n".join(lines)
     _admin = admin_lw_id or ADMIN_LW_ID
-    if lw_api.send_message(_admin, message):
+    if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):
         db.record_alert("__admin__", "morning_check", yesterday_str, message)
         logger.info("翌朝チェック送信完了（未申請: %d名, 申請済: %d名）", len(no_request), len(has_request))
     else:

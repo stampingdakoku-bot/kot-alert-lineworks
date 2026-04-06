@@ -83,6 +83,28 @@ def send_message(user_id, text):
             logger.error(f"Response: {e.response.text}")
         return False
 
+def send_group_message(channel_id, text):
+    token = get_access_token()
+    if not token:
+        logger.error("アクセストークンがないためグループメッセージ送信不可")
+        return False
+    url = f"{API_BASE}/bots/{LW_BOT_ID}/channels/{channel_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    body = {"content": {"type": "text", "text": text}}
+    try:
+        resp = requests.post(url, json=body, headers=headers, timeout=30)
+        resp.raise_for_status()
+        logger.info(f"グループメッセージ送信成功: {channel_id}")
+        return True
+    except Exception as e:
+        logger.error(f"グループメッセージ送信失敗 ({channel_id}): {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"Response: {e.response.text}")
+        return False
+
 def test_connection():
     token = get_access_token()
     if token:

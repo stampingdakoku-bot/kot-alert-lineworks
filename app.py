@@ -84,10 +84,12 @@ def logout():
 
 @app.before_request
 def check_auth():
-    if request.endpoint in ('login', 'static'):
-        return
-    if not session.get('authenticated'):
-        return redirect(url_for('login'))
+    # 一時的に認証を無効化
+    return
+    # if request.endpoint in ('login', 'static'):
+    #     return
+    # if not session.get('authenticated'):
+    #     return redirect(url_for('login'))
 
 
 def _get_store_shifts_and_attendance(today_str):
@@ -823,6 +825,16 @@ def settings():
     import db_supabase as _db
     templates = _db.get_alert_templates()
     return render_template('settings.html', s=s, templates=templates)
+
+
+@app.route('/callback', methods=['POST'])
+def callback():
+    data = request.json or {}
+    print(f"[CALLBACK] received: {data}", flush=True)
+    channel_id = data.get('source', {}).get('channelId', '')
+    if channel_id:
+        print(f"[CALLBACK] channelId: {channel_id}", flush=True)
+    return 'OK', 200
 
 
 if __name__ == '__main__':

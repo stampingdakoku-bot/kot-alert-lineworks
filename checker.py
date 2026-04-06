@@ -477,39 +477,86 @@ def send_daily_report(all_emps=None, yesterday_str=None):
         problem_names[ft].add(ek)
         counts[ft] = counts.get(ft, 0) + 1
 
+    # KOT APIから前日の退勤打刻時刻を取得
+    clockout_map = {}
+    try:
+        daily_data = kot_api.get_daily_workings(yesterday_str)
+        workings = []
+        if isinstance(daily_data, dict):
+            workings = daily_data.get("dailyWorkings", [])
+        elif isinstance(daily_data, list):
+            for d in daily_data:
+                if isinstance(d, dict):
+                    workings.extend(d.get("dailyWorkings", []) or [d])
+        for w in workings:
+            ek = w.get("employeeKey", "")
+            if not ek:
+                continue
+            records = w.get("timeRecord", [])
+            if isinstance(records, dict):
+                records = [records]
+            latest_out = None
+            for tr in records:
+                if str(tr.get("code", "")) == "2":
+                    t = tr.get("time", "")
+                    if t:
+                        try:
+                            dt = datetime.fromisoformat(t)
+                            if latest_out is None or dt > latest_out:
+                                latest_out = dt
+                        except ValueError:
+                            pass
+            if latest_out is not None:
+                clockout_map[ek] = latest_out.strftime("%H:%M")
+    except Exception as e:
+        logger.warning("前日打刻データ取得失敗: %s", str(e))
+
+    def _name(ek):
+        emp = all_emps.get(ek, {})
+        return (emp.get("last_name", "") + emp.get("first_name", "")).strip() or "?"
+
+    def _name_with_clockout(ek):
+        nm = _name(ek)
+        if ek in clockout_map:
+            return nm + " 退勤" + clockout_map[ek]
+        return nm + " 退勤なし"
+
+    def _names_with_clockout(ft):
+        eks = problem_names.get(ft, set())
+        return "、".join(sorted(_name_with_clockout(ek) for ek in eks))
+
     def _names(ft):
         eks = problem_names.get(ft, set())
-        names = []
-        for ek in eks:
-            emp = all_emps.get(ek, {})
-            nm = (emp.get("last_name", "") + emp.get("first_name", "")).strip() or "?"
-            names.append(nm)
-        return "、".join(sorted(names))
+        return "、".join(sorted(_name(ek) for ek in eks))
 
     lines = ["📊 前日勤怠まとめ（" + yesterday_str + "）", ""]
 
-    flow_labels = [
-        ("late_clockin", "出勤打刻なし"),
-        ("overtime", "超過警告"),
-        ("deviation", "乖離通知"),
-    ]
-    for ft, label in flow_labels:
+    for ft, label in [("late_clockin", "出勤打刻なし"), ("overtime", "超過警告")]:
         cnt = counts.get(ft, 0)
         if cnt > 0:
-            lines.append(label + ": " + str(cnt) + "件（" + _names(ft) + "）")
+            lines.append(label + ": " + str(cnt) + "件（" + _names_with_clockout(ft) + "）")
         else:
             lines.append(label + ": 0件")
 
-    # 申請漏れ情報（deviation対象者のKOT打刻修正申請有無）
+    dev_cnt = counts.get("deviation", 0)
+    if dev_cnt > 0:
+        lines.append("乖離通知: " + str(dev_cnt) + "件（" + _names("deviation") + "）")
+    else:
+        lines.append("乖離通知: 0件")
+
+    # 申請漏れ情報（late_clockin + overtime + deviation 対象者の申請有無）
     lines.append("")
-    deviation_eks = list(problem_names.get("deviation", set()))
-    if deviation_eks:
+    target_eks = set()
+    for ft in ("late_clockin", "overtime", "deviation"):
+        target_eks |= problem_names.get(ft, set())
+    target_eks = list(target_eks)
+
+    if target_eks:
         tr_requests = get_timerecord_requests(yesterday_str)
         no_request = []
         has_request = []
-        for ek in deviation_eks:
-            emp = all_emps.get(ek, {})
-            nm = (emp.get("last_name", "") + emp.get("first_name", "")).strip() or "?"
+        for ek in target_eks:
+            nm = _name(ek)
             if has_request_for_today(ek, tr_requests):
                 has_request.append(nm)
             else:
@@ -521,7 +568,7 @@ def send_daily_report(all_emps=None, yesterday_str=None):
         if not no_request:
             lines.append("全員申請済みです。")
     else:
-        lines.append("シフト超過者なし。申請チェック不要です。")
+        lines.append("対象者なし。申請チェック不要です。")
 
     lines.append("")
     lines.append("⚙️ 申請漏れがある場合はKING OF TIMEより修正を行ってください。")

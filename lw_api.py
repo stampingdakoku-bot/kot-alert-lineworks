@@ -83,7 +83,7 @@ def send_message(user_id, text):
             logger.error(f"Response: {e.response.text}")
         return False
 
-def send_group_message(channel_id, text):
+def send_group_message(channel_id, text, silent=False):
     token = get_access_token()
     if not token:
         logger.error("アクセストークンがないためグループメッセージ送信不可")
@@ -94,6 +94,8 @@ def send_group_message(channel_id, text):
         "Content-Type": "application/json"
     }
     body = {"content": {"type": "text", "text": text}}
+    if silent:
+        body["notificationDisabled"] = True
     try:
         resp = requests.post(url, json=body, headers=headers, timeout=30)
         resp.raise_for_status()

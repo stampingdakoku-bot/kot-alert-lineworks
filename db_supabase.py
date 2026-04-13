@@ -2,6 +2,7 @@
 kot-alert: データベース管理 (Supabase版)
 """
 import os
+import re
 from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client
@@ -12,6 +13,17 @@ supabase = create_client(
     os.getenv('SUPABASE_URL'),
     os.getenv('SUPABASE_SERVICE_ROLE_KEY')
 )
+
+
+def _parse_iso(ts):
+    if not ts:
+        return None
+    # Python 3.10互換: 小数部を0,3,6桁以外の場合6桁にパディング
+    m = re.match(r'(.+\.)(\d+)(.*)$', ts)
+    if m:
+        frac = m.group(2).ljust(6, '0')[:6]
+        ts = m.group(1) + frac + m.group(3)
+    return datetime.fromisoformat(ts)
 
 
 def was_alert_sent(employee_key, flow_type, alert_date):
@@ -56,7 +68,7 @@ def get_last_alert_time(employee_key, flow_type, alert_date):
         .limit(1) \
         .execute()
     if result.data:
-        return datetime.fromisoformat(result.data[0]['sent_at'])
+        return _parse_iso(result.data[0]['sent_at'])
     return None
 
 

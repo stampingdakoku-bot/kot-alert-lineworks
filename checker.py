@@ -786,7 +786,7 @@ def run_clock_error_reminder(dry_run=False):
 
     logger.info("isErrorスキャン完了: %d名にエラーあり", len(error_map))
 
-    # ② 申請済み(applying/approved)を取得（月跨ぎ対応）
+    # ② 申請中(applying)を取得して除外（月跨ぎ対応）
     pending_dates = set()
     months_to_check = set()
     months_to_check.add((period_start.year, period_start.month))
@@ -795,9 +795,9 @@ def run_clock_error_reminder(dry_run=False):
         pending_dates |= kot_api.get_pending_timerecord_dates(y, m)
         _time.sleep(0.3)
 
-    logger.info("申請済みレコード: %d件", len(pending_dates))
+    logger.info("申請中(除外対象): %d件", len(pending_dates))
 
-    # ③ 申請済みエラーを除外
+    # ③ 申請中エラーを除外（approved/rejectedはisErrorで自然制御）
     for ek in list(error_map.keys()):
         error_map[ek] = [
             (d_str, store, etype)

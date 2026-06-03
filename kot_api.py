@@ -118,12 +118,12 @@ def parse_schedules_for_employee(schedule_data):
     return result
 
 def get_pending_timerecord_dates(year, month):
-    """月内の打刻申請を取得し、{(employee_key, date_str)} のセットを返す"""
+    """月内の申請中(applying)打刻申請の {(employee_key, date_str)} セットを返す"""
     data = get_timerecord_requests(year, month)
     result = set()
     if data:
         for req in data.get('requests', []):
-            if req.get('status') in ('applying', 'approved'):
+            if req.get('status') == 'applying':
                 emp_key = req.get('employeeKey')
                 req_date = req.get('date')
                 if emp_key and req_date:

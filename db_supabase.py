@@ -209,6 +209,56 @@ def get_alert_settings():
     }
 
 
+def get_clock_error_tracking(employee_key):
+    """clock_error_trackingから従業員のレコードを取得"""
+    result = supabase.table('clock_error_tracking') \
+        .select('*') \
+        .eq('employee_key', employee_key) \
+        .limit(1) \
+        .execute()
+    return result.data[0] if result.data else None
+
+
+def upsert_clock_error_tracking(employee_key, remind_count):
+    """エスカレーション回数を更新（レコードがなければ作成）"""
+    now = datetime.now().isoformat()
+    existing = get_clock_error_tracking(employee_key)
+    if existing:
+        supabase.table('clock_error_tracking').update({
+            'remind_count': remind_count,
+            'last_sent_at': now,
+            'resolved': False,
+            'resolved_at': None,
+        }).eq('employee_key', employee_key).execute()
+    else:
+        supabase.table('clock_error_tracking').insert({
+            'employee_key': employee_key,
+            'remind_count': remind_count,
+            'last_sent_at': now,
+            'resolved': False,
+        }).execute()
+
+
+def resolve_clock_error(employee_key):
+    """全エラー解消時にresolvedフラグをセット"""
+    now = datetime.now().isoformat()
+    supabase.table('clock_error_tracking').update({
+        'resolved': True,
+        'resolved_at': now,
+    }).eq('employee_key', employee_key).execute()
+
+
+def reset_clock_error(employee_key):
+    """解消後に再発した場合、カウントをリセットして再開"""
+    now = datetime.now().isoformat()
+    supabase.table('clock_error_tracking').update({
+        'remind_count': 1,
+        'last_sent_at': now,
+        'resolved': False,
+        'resolved_at': None,
+    }).eq('employee_key', employee_key).execute()
+
+
 ALERT_TEMPLATES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'alert_templates.json')
 
 def get_alert_templates():

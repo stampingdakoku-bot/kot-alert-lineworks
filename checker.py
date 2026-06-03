@@ -705,5 +705,205 @@ def send_morning_request_check(yesterday_str, all_emps, admin_lw_id=None):
         logger.error("翌朝チェック送信失敗")
 
 
+def get_payroll_period(today):
+    """16日締めの給与期間を返す（end_dateは前日）"""
+    yesterday = today - timedelta(days=1)
+    if today.day >= 16:
+        start = today.replace(day=16)
+    else:
+        first_of_month = today.replace(day=1)
+        prev_month_last = first_of_month - timedelta(days=1)
+        start = prev_month_last.replace(day=16)
+    return start.date() if hasattr(start, 'date') else start, \
+           yesterday.date() if hasattr(yesterday, 'date') else yesterday
+
+
+def run_clock_error_reminder(dry_run=False):
+    """打刻エラーリマインド: 給与締め期間内のisErrorを全日スキャンし通知"""
+    import time as _time
+
+    now = datetime.now(JST)
+    today = now.date()
+    today_str = today.isoformat()
+
+    logger.info("=" * 50)
+    logger.info("打刻エラーリマインド開始%s", " [DRY-RUN]" if dry_run else "")
+
+    settings = db.get_alert_settings()
+    if not settings.get('clock_error_reminder_enabled', True):
+        logger.info("clock_error_reminder は無効です")
+        return
+
+    # LINE WORKS トークン取得（dry-runでも取得はしておく）
+    lw_api._token_cache["access_token"] = None
+    lw_api._token_cache["expires_at"] = 0
+    token = lw_api.get_access_token()
+    if not token and not dry_run:
+        logger.error("LINE WORKSトークン取得失敗")
+        return
+
+    # 従業員マスタ・マッピング
+    all_emps = {e["employee_key"]: e for e in db.get_all_employees()}
+    mappings_list = db.get_all_mappings()
+    mappings = {m["employee_key"]: m["lw_account_id"] for m in mappings_list}
+
+    # テンプレート
+    alert_templates = db.get_alert_templates()
+
+    # 給与締め期間
+    period_start, period_end = get_payroll_period(now)
+    logger.info("対象期間: %s 〜 %s", period_start, period_end)
+
+    # ① 期間内の全日 daily-workings から isError=true を収集
+    error_map = {}  # {employee_key: [(date_str, store_name, error_type), ...]}
+    d = period_start
+    while d <= period_end:
+        d_str = d.isoformat()
+        data = kot_api.get_daily_workings(d_str)
+        if data and 'dailyWorkings' in data:
+            error_emps = [r for r in data['dailyWorkings'] if r.get('isError')]
+            if error_emps:
+                # この日のtimerecordを取得してエラー種別を推定
+                _time.sleep(0.3)
+                tr_data = kot_api.get_timerecords(d_str)
+                tr_by_emp = {}
+                if tr_data and 'dailyWorkings' in tr_data:
+                    for w in tr_data['dailyWorkings']:
+                        ek = w.get('employeeKey', '')
+                        tr_by_emp[ek] = w.get('timeRecord', [])
+
+                for r in error_emps:
+                    ek = r.get('employeeKey', '')
+                    store = r.get('workPlaceDivisionName', '不明')
+                    records = tr_by_emp.get(ek, [])
+                    error_type = kot_api.classify_clock_error(records)
+                    if ek not in error_map:
+                        error_map[ek] = []
+                    error_map[ek].append((d_str, store, error_type))
+
+        d += timedelta(days=1)
+        _time.sleep(0.3)  # レート制限配慮
+
+    logger.info("isErrorスキャン完了: %d名にエラーあり", len(error_map))
+
+    # ② 申請済み(applying/approved)を取得（月跨ぎ対応）
+    pending_dates = set()
+    months_to_check = set()
+    months_to_check.add((period_start.year, period_start.month))
+    months_to_check.add((period_end.year, period_end.month))
+    for y, m in months_to_check:
+        pending_dates |= kot_api.get_pending_timerecord_dates(y, m)
+        _time.sleep(0.3)
+
+    logger.info("申請済みレコード: %d件", len(pending_dates))
+
+    # ③ 申請済みエラーを除外
+    for ek in list(error_map.keys()):
+        error_map[ek] = [
+            (d_str, store, etype)
+            for d_str, store, etype in error_map[ek]
+            if (ek, d_str) not in pending_dates
+        ]
+        if not error_map[ek]:
+            del error_map[ek]
+
+    logger.info("申請除外後: %d名に未解消エラーあり", len(error_map))
+
+    # ④ 既存トラッキングを全件取得（解消判定用）
+    all_tracking = {}
+    for emp_data in db.supabase.table('clock_error_tracking').select('*').execute().data:
+        all_tracking[emp_data['employee_key']] = emp_data
+
+    # ⑤ 前回エラーがあったが今回全解消 → resolve
+    for ek, trk in all_tracking.items():
+        if ek not in error_map and not trk.get('resolved'):
+            if not dry_run:
+                db.resolve_clock_error(ek)
+            logger.info("%s全エラー解消: %s", "[DRY-RUN] " if dry_run else "", _emp_name(ek, all_emps))
+
+    # ⑥ 未解消エラーが残る従業員に通知
+    sent_count = 0
+    for ek, errors in error_map.items():
+        # マッピングがなければ通知不可
+        lw_id = mappings.get(ek)
+        if not lw_id:
+            logger.warning("マッピングなし: %s", ek[:12])
+            continue
+
+        # 1日1通制御
+        if db.was_alert_sent(ek, 'clock_error_reminder', today_str):
+            logger.debug("本日送信済み: %s", _emp_name(ek, all_emps))
+            continue
+
+        # エスカレーション回数の決定（dry-runではDB更新しない）
+        trk = all_tracking.get(ek)
+        if trk is None:
+            remind_count = 1
+            if not dry_run:
+                db.upsert_clock_error_tracking(ek, remind_count)
+        elif trk.get('resolved'):
+            remind_count = 1
+            if not dry_run:
+                db.reset_clock_error(ek)
+        else:
+            remind_count = trk.get('remind_count', 0) + 1
+            if not dry_run:
+                db.upsert_clock_error_tracking(ek, remind_count)
+
+        # テンプレート選択（1, 2, 3以上）
+        if remind_count <= 1:
+            tmpl_key = 'clock_error_reminder_1'
+        elif remind_count == 2:
+            tmpl_key = 'clock_error_reminder_2'
+        else:
+            tmpl_key = 'clock_error_reminder_3'
+
+        default_templates = {
+            'clock_error_reminder_1': '【打刻エラーの修正依頼】\n{employee_name}さん\n\n下記{error_count}件の打刻エラーが未修正です。\n給与の正確な計算のため、速やかにKOTから打刻申請で修正してください。\n\n▼要修正の打刻エラー（{error_count}件）\n{error_list}\n\n【修正手順】\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請',
+            'clock_error_reminder_2': '【再送】打刻エラーが未修正です\n{employee_name}さん\n\n先日お知らせした打刻エラーが、まだ修正されていません。\n給与計算に影響しますので、本日中にKOTから打刻申請で修正してください。\n\n▼要修正の打刻エラー（{error_count}件）\n{error_list}\n\n【修正手順】\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請',
+            'clock_error_reminder_3': '【重要】打刻エラー未修正のお知らせ\n{employee_name}さん\n\n複数回お知らせしていますが、下記{error_count}件の打刻エラーが未修正のままです。\nこのまま修正がない場合、給与計算に反映できないだけでなく、勤怠管理上の評価にも影響します。\n至急、KOTから打刻申請で修正してください。未対応が続く場合は個別に確認させていただきます。\n\n▼要修正の打刻エラー（{error_count}件）\n{error_list}\n\n【修正手順】\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請',
+        }
+        tmpl = alert_templates.get(tmpl_key, default_templates.get(tmpl_key, ''))
+
+        # エラー一覧の組み立て
+        emp_name = _emp_name(ek, all_emps)
+        error_lines = []
+        for d_str, store, etype in sorted(errors, key=lambda x: x[0]):
+            d_obj = datetime.strptime(d_str, '%Y-%m-%d')
+            weekday = '月火水木金土日'[d_obj.weekday()]
+            # 店舗名から共通プレフィックスを除去
+            short_store = store.replace('トレジャーコレクション', '')
+            error_lines.append(f'・{d_str[5:]}({weekday}) {short_store} — {etype}')
+        error_list = '\n'.join(error_lines)
+
+        message = tmpl.format(employee_name=emp_name, error_count=len(error_lines), error_list=error_list)
+
+        if dry_run:
+            logger.info("[DRY-RUN] 送信対象: %s (%d通目)\n%s", emp_name, remind_count, message)
+        else:
+            if lw_api.send_message(lw_id, message):
+                db.record_alert(ek, 'clock_error_reminder', today_str, message)
+                logger.info("打刻エラーリマインド(%d通目): %s", remind_count, emp_name)
+            else:
+                logger.error("送信失敗: %s", emp_name)
+        sent_count += 1
+
+    logger.info("打刻エラーリマインド完了: %d名に%s",
+                sent_count, "送信予定(dry-run)" if dry_run else "送信")
+    logger.info("=" * 50)
+
+
+def _emp_name(employee_key, all_emps):
+    """employee_keyから表示用名前を取得"""
+    emp = all_emps.get(employee_key, {})
+    last = emp.get('last_name', '')
+    first = emp.get('first_name', '')
+    return (last + first).strip() or employee_key[:12]
+
+
 if __name__ == "__main__":
-    main()
+    if "--clock-error" in sys.argv:
+        dry_run = "--dry-run" in sys.argv
+        run_clock_error_reminder(dry_run=dry_run)
+    else:
+        main()

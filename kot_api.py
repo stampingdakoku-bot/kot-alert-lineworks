@@ -31,6 +31,8 @@ def _get(endpoint, params=None):
     try:
         resp = requests.get(url, headers=HEADERS, params=params, timeout=30)
         resp.raise_for_status()
+        if resp.status_code == 204:
+            return None
         data = resp.json()
         logger.debug(f"Response: {resp.status_code}")
         return data
@@ -60,10 +62,10 @@ def get_schedules(date_str):
     return _get(f"/daily-schedules/{date_str}")
 
 def get_overtime_requests(year, month):
-    return _get(f"/overtime-requests/{year}/{month}")
+    return _get(f"/requests/overtimes/{year}-{int(month):02d}")
 
 def get_timerecord_requests(year, month):
-    return _get(f"/timerecord-requests/{year}/{month}")
+    return _get(f"/requests/timerecords/{year}-{int(month):02d}")
 
 def parse_timerecords_for_employee(daily_data):
     result = {}
@@ -114,6 +116,37 @@ def parse_schedules_for_employee(schedule_data):
                 pass
         result[key] = {"start": start, "end": end, "raw": item}
     return result
+
+def get_pending_timerecord_dates(year, month):
+    """月内の打刻申請を取得し、{(employee_key, date_str)} のセットを返す"""
+    data = get_timerecord_requests(year, month)
+    result = set()
+    if data:
+        for req in data.get('requests', []):
+            if req.get('status') in ('applying', 'approved'):
+                emp_key = req.get('employeeKey')
+                req_date = req.get('date')
+                if emp_key and req_date:
+                    result.add((emp_key, req_date))
+    return result
+
+
+def classify_clock_error(timerecords):
+    """timeRecordリストから打刻エラー種別を推定する"""
+    if not timerecords:
+        return "打刻なし"
+    in_count = sum(1 for r in timerecords if str(r.get('code', '')) == '1')
+    out_count = sum(1 for r in timerecords if str(r.get('code', '')) == '2')
+    if in_count == 0 and out_count == 0:
+        return "打刻なし"
+    if in_count > 0 and out_count == 0:
+        return "退勤打刻なし"
+    if in_count == 0 and out_count > 0:
+        return "出勤打刻なし"
+    if in_count > 1 or out_count > 1:
+        return "打刻重複"
+    return "打刻エラー"
+
 
 def has_pending_request(employee_key, year, month):
     ot_data = get_overtime_requests(year, month)

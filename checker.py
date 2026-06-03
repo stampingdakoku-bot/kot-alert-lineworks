@@ -824,6 +824,12 @@ def run_clock_error_reminder(dry_run=False):
     # ⑥ 未解消エラーが残る従業員に通知
     sent_count = 0
     for ek, errors in error_map.items():
+        # 除外対象はスキップ
+        emp_info = all_emps.get(ek, {})
+        if emp_info.get('is_excluded'):
+            logger.info("除外対象スキップ: %s", _emp_name(ek, all_emps))
+            continue
+
         # マッピングがなければ通知不可
         lw_id = mappings.get(ek)
         if not lw_id:

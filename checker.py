@@ -450,6 +450,26 @@ def main():
 ADMIN_LW_ID = "sakamoto.tatsuya@avivastarscorporation"
 
 
+def get_break45_for_date(date_str, all_emps):
+    """指定日のbreakTime==45の従業員を抽出(is_excluded除外済み)。
+    戻り値: [(employee_key, store_name, totalWork), ...]"""
+    results = []
+    data = kot_api.get_daily_workings(date_str)
+    if data and 'dailyWorkings' in data:
+        for r in data['dailyWorkings']:
+            if r.get('breakTime') == 45:
+                ek = r.get('employeeKey', '')
+                emp_info = all_emps.get(ek, {})
+                if emp_info.get('is_excluded'):
+                    continue
+                results.append((
+                    ek,
+                    r.get('workPlaceDivisionName', '不明'),
+                    r.get('totalWork', 0),
+                ))
+    return results
+
+
 def send_daily_report(all_emps=None, yesterday_str=None):
     """前日の勤怠まとめを13:10にグループ送信する"""
     if yesterday_str is None:
@@ -569,6 +589,25 @@ def send_daily_report(all_emps=None, yesterday_str=None):
             lines.append("全員申請済みです。")
     else:
         lines.append("対象者なし。申請チェック不要です。")
+
+    # 45分休憩 確認対象（前日分）
+    break45_entries = get_break45_for_date(yesterday_str, all_emps)
+    # applying除外
+    if break45_entries:
+        d_obj = datetime.strptime(yesterday_str, '%Y-%m-%d')
+        pending_dates = kot_api.get_pending_timerecord_dates(d_obj.year, d_obj.month)
+        break45_entries = [
+            (ek, store, tw) for ek, store, tw in break45_entries
+            if (ek, yesterday_str) not in pending_dates
+        ]
+    lines.append("")
+    if break45_entries:
+        lines.append("45分休憩 確認対象: " + str(len(break45_entries)) + "件")
+        for ek, store, tw in break45_entries:
+            short_store = store.replace('トレジャーコレクション', '')
+            lines.append("  " + _name(ek) + "（" + short_store + " 稼働" + str(tw) + "分）")
+    else:
+        lines.append("45分休憩 確認対象: 0件")
 
     lines.append("")
     lines.append("⚙️ 申請漏れがある場合はKING OF TIMEより修正を行ってください。")
@@ -924,37 +963,20 @@ def run_break_warning(dry_run=False):
     period_start, period_end = get_payroll_period(now)
     logger.info("対象期間: %s 〜 %s", period_start, period_end)
 
-    # ① 期間内の全日 daily-workings から breakTime==45 を収集
+    # ① 期間内の全日 daily-workings から breakTime==45 を収集（ヘルパー使用、is_excluded除外済み）
     break45_map = {}  # {employee_key: [(date_str, store, totalWork, breakTime, isError), ...]}
     d = period_start
     while d <= period_end:
         d_str = d.isoformat()
-        data = kot_api.get_daily_workings(d_str)
-        if data and 'dailyWorkings' in data:
-            for r in data['dailyWorkings']:
-                if r.get('breakTime') == 45:
-                    ek = r.get('employeeKey', '')
-                    break45_map.setdefault(ek, []).append((
-                        d_str,
-                        r.get('workPlaceDivisionName', '不明'),
-                        r.get('totalWork', 0),
-                        45,
-                        r.get('isError', False),
-                    ))
+        entries = get_break45_for_date(d_str, all_emps)
+        for ek, store, total_work in entries:
+            break45_map.setdefault(ek, []).append((
+                d_str, store, total_work, 45, False,
+            ))
         d += timedelta(days=1)
         _time.sleep(0.3)
 
-    logger.info("breakTime==45 スキャン完了: %d名に該当あり", len(break45_map))
-
-    # ② is_excluded を除外
-    excluded_count = 0
-    for ek in list(break45_map.keys()):
-        emp_info = all_emps.get(ek, {})
-        if emp_info.get('is_excluded'):
-            logger.info("除外対象スキップ(is_excluded): %s", _emp_name(ek, all_emps))
-            del break45_map[ek]
-            excluded_count += 1
-    logger.info("is_excluded除外: %d名", excluded_count)
+    logger.info("breakTime==45 スキャン完了(is_excluded除外済み): %d名に該当あり", len(break45_map))
 
     # ③ applying中の修正申告がある勤務日を除外
     pending_dates = set()

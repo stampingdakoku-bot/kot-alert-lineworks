@@ -208,6 +208,15 @@ venv/bin/python3 checker.py
 - overtimeアラートとrequest_reminderの重複防止（最終overtime送信から設定間隔分後に送信）
 - db_supabase.pyにget_last_alert_time()関数を追加
 
+## clock_error_reminder 本番稼働（2026-06-04 初回自動実行 正常確認済み）
+- cron: `0 8 * * *` で checker.py --clock-error を毎日実行（--dry-runは2026-06-03に除去済み・本番モード）
+- ログ出力先: logs/clock_error_dryrun.log（※dry-run時代のファイル名のまま。中身は本番ログ。将来 clock_error.log にリネーム予定）
+- 申請除外ロジック: status=='applying' のみ除外（isDeleteは問わない）。approved/rejectedは除外しない（KOT側のisErrorで自然制御される）。commit 0b6f5a3
+- 二重送信ガード: was_alert_sent(employee_key, 'clock_error_reminder', alert_date) が alerts_sent を参照してSKIP判定。clock_error_tracking の remind_count はエスカレーション段数のみ制御（SKIP判定には使わない）
+- alerts_sent の flow_type CHECK制約に 'clock_error_reminder' を追加済み（2026-06-03、Supabase SQL Editorで手動ALTER）
+- マッピング漏れ5名を督促対象として登録済み（矢幡4011・金広1021・河野1022・杉村4012・日高4013）。味志祥太朗4014は退職予定のため未登録。LW IDはUUID形式必須（ログインID av.xxxxx@... 形式は不可）
+- 初回自動実行(06-04 08:00)結果: 解消2名(白井・内田)が送信スキップ＝resolved化、未修正3名(佐久間・河村遥華・吉武)が2通目、新規1名(大田和斗)が1通目。除外勢(宮崎・西森=is_excluded、applying19件)漏れなし。Exit 0完走
+
 ## 既知の課題
 - HTTPS未対応（ドメイン取得後に対応予定）
 - マネフォビジネス給与API連携検討中

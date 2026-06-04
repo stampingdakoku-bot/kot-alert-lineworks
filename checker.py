@@ -907,9 +907,97 @@ def _emp_name(employee_key, all_emps):
     return (last + first).strip() or employee_key[:12]
 
 
+def run_break_warning(dry_run=False):
+    """45分休憩検出: 給与締め期間内のbreakTime==45を全日スキャンしログ出力"""
+    import time as _time
+
+    now = datetime.now(JST)
+    today_str = now.strftime("%Y-%m-%d")
+
+    logger.info("=" * 50)
+    logger.info("45分休憩チェック開始%s", " [DRY-RUN]" if dry_run else "")
+
+    # 従業員マスタ
+    all_emps = {e["employee_key"]: e for e in db.get_all_employees()}
+
+    # 給与締め期間
+    period_start, period_end = get_payroll_period(now)
+    logger.info("対象期間: %s 〜 %s", period_start, period_end)
+
+    # ① 期間内の全日 daily-workings から breakTime==45 を収集
+    break45_map = {}  # {employee_key: [(date_str, store, totalWork, breakTime, isError), ...]}
+    d = period_start
+    while d <= period_end:
+        d_str = d.isoformat()
+        data = kot_api.get_daily_workings(d_str)
+        if data and 'dailyWorkings' in data:
+            for r in data['dailyWorkings']:
+                if r.get('breakTime') == 45:
+                    ek = r.get('employeeKey', '')
+                    break45_map.setdefault(ek, []).append((
+                        d_str,
+                        r.get('workPlaceDivisionName', '不明'),
+                        r.get('totalWork', 0),
+                        45,
+                        r.get('isError', False),
+                    ))
+        d += timedelta(days=1)
+        _time.sleep(0.3)
+
+    logger.info("breakTime==45 スキャン完了: %d名に該当あり", len(break45_map))
+
+    # ② is_excluded を除外
+    excluded_count = 0
+    for ek in list(break45_map.keys()):
+        emp_info = all_emps.get(ek, {})
+        if emp_info.get('is_excluded'):
+            logger.info("除外対象スキップ(is_excluded): %s", _emp_name(ek, all_emps))
+            del break45_map[ek]
+            excluded_count += 1
+    logger.info("is_excluded除外: %d名", excluded_count)
+
+    # ③ applying中の修正申告がある勤務日を除外
+    pending_dates = set()
+    months_to_check = set()
+    months_to_check.add((period_start.year, period_start.month))
+    months_to_check.add((period_end.year, period_end.month))
+    for y, m in months_to_check:
+        pending_dates |= kot_api.get_pending_timerecord_dates(y, m)
+        _time.sleep(0.3)
+
+    applying_excluded = 0
+    for ek in list(break45_map.keys()):
+        before = len(break45_map[ek])
+        break45_map[ek] = [
+            entry for entry in break45_map[ek]
+            if (ek, entry[0]) not in pending_dates
+        ]
+        applying_excluded += before - len(break45_map[ek])
+        if not break45_map[ek]:
+            del break45_map[ek]
+    logger.info("申請中(applying)除外: %d件", applying_excluded)
+
+    # ④ 結果出力
+    total_targets = sum(len(v) for v in break45_map.values())
+    logger.info("対象: %d件 %d名", total_targets, len(break45_map))
+
+    for ek in sorted(break45_map.keys(), key=lambda k: _emp_name(k, all_emps)):
+        emp_name = _emp_name(ek, all_emps)
+        for d_str, store, total_work, break_time, is_error in sorted(break45_map[ek]):
+            short_store = store.replace('トレジャーコレクション', '')
+            logger.info("  %s  %s  %s  稼働%d分  休憩%d分  isError=%s",
+                         d_str, emp_name, short_store, total_work, break_time, is_error)
+
+    logger.info("45分休憩チェック完了")
+    logger.info("=" * 50)
+
+
 if __name__ == "__main__":
     if "--clock-error" in sys.argv:
         dry_run = "--dry-run" in sys.argv
         run_clock_error_reminder(dry_run=dry_run)
+    elif "--break-warning" in sys.argv:
+        dry_run = "--dry-run" in sys.argv
+        run_break_warning(dry_run=dry_run)
     else:
         main()

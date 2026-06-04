@@ -977,18 +977,66 @@ def run_break_warning(dry_run=False):
             del break45_map[ek]
     logger.info("申請中(applying)除外: %d件", applying_excluded)
 
-    # ④ 結果出力
+    # ④ マッピング取得（本人DM送信用）
+    mappings_list = db.get_all_mappings()
+    mappings = {m["employee_key"]: m["lw_account_id"] for m in mappings_list}
+
+    # LINE WORKS トークン取得（dry-runでも取得はしておく）
+    if not dry_run:
+        lw_api._token_cache["access_token"] = None
+        lw_api._token_cache["expires_at"] = 0
+        token = lw_api.get_access_token()
+        if not token:
+            logger.error("LINE WORKSトークン取得失敗")
+            return
+
+    # ⑤ 本人DM送信（勤務日ごとに個別判定・個別送信）
     total_targets = sum(len(v) for v in break45_map.values())
     logger.info("対象: %d件 %d名", total_targets, len(break45_map))
 
+    sent_count = 0
+    skip_count = 0
     for ek in sorted(break45_map.keys(), key=lambda k: _emp_name(k, all_emps)):
         emp_name = _emp_name(ek, all_emps)
+
+        # マッピングチェック
+        lw_id = mappings.get(ek)
+        if not lw_id:
+            logger.warning("マッピングなし(送信不能): %s", emp_name)
+            continue
+
         for d_str, store, total_work, break_time, is_error in sorted(break45_map[ek]):
             short_store = store.replace('トレジャーコレクション', '')
-            logger.info("  %s  %s  %s  稼働%d分  休憩%d分  isError=%s",
-                         d_str, emp_name, short_store, total_work, break_time, is_error)
 
-    logger.info("45分休憩チェック完了")
+            # 二重送信ガード（勤務日ごと）
+            if db.was_alert_sent(ek, 'break_warning', d_str):
+                logger.info("送信済みスキップ: %s %s", emp_name, d_str)
+                skip_count += 1
+                continue
+
+            # 文面生成
+            d_obj = datetime.strptime(d_str, '%Y-%m-%d')
+            date_label = f"{d_obj.month}月{d_obj.day}日"
+            message = (
+                f"{date_label}の勤務に45分休憩が記録されています。"
+                f"内容に間違いはありませんか？\n"
+                f"もし打刻ミス等で実際と異なる場合は、"
+                f"KING OF TIMEで修正申告をお願いします。"
+            )
+
+            if dry_run:
+                logger.info("[DRY-RUN] 送信対象: %s  %s  %s  稼働%d分  休憩%d分  isError=%s\n%s",
+                            d_str, emp_name, short_store, total_work, break_time, is_error, message)
+            else:
+                if lw_api.send_message(lw_id, message):
+                    db.record_alert(ek, 'break_warning', d_str, message)
+                    logger.info("45分休憩通知送信: %s %s", emp_name, d_str)
+                else:
+                    logger.error("送信失敗: %s %s", emp_name, d_str)
+            sent_count += 1
+
+    logger.info("45分休憩チェック完了: %d件%s, %d件スキップ(送信済み)",
+                sent_count, "(dry-run)" if dry_run else "送信", skip_count)
     logger.info("=" * 50)
 
 

@@ -442,6 +442,7 @@ def main():
         yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
         if not db.was_alert_sent("__admin__", "morning_check", yesterday_str):
             send_daily_report(all_emps, yesterday_str)
+        run_break_warning(dry_run=False)
 
     logger.info("=" * 50)
 

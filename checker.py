@@ -907,7 +907,7 @@ def run_clock_error_reminder(dry_run=False):
         default_templates = {
             'clock_error_reminder_1': '【打刻エラーの修正依頼】\n{employee_name}さん\n\n下記{error_count}件の打刻エラーが未修正です。\n給与の正確な計算のため、速やかにKOTから打刻申請で修正してください。\n\n▼要修正の打刻エラー（{error_count}件）\n{error_list}\n\n【修正手順】\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請',
             'clock_error_reminder_2': '【再送】打刻エラーが未修正です\n{employee_name}さん\n\n先日お知らせした打刻エラーが、まだ修正されていません。\n給与計算に影響しますので、本日中にKOTから打刻申請で修正してください。\n\n▼要修正の打刻エラー（{error_count}件）\n{error_list}\n\n【修正手順】\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請',
-            'clock_error_reminder_3': '【重要】打刻エラー未修正のお知らせ\n{employee_name}さん\n\n複数回お知らせしていますが、下記{error_count}件の打刻エラーが未修正のままです。\nこのまま修正がない場合、給与計算に反映できないだけでなく、勤怠管理上の評価にも影響します。\n至急、KOTから打刻申請で修正してください。未対応が続く場合は個別に確認させていただきます。\n\n▼要修正の打刻エラー（{error_count}件）\n{error_list}\n\n【修正手順】\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請',
+            'clock_error_reminder_3': '🚨【最終警告】打刻エラー未修正 🚨\n{employee_name}さん\n\n複数回お知らせしていますが、下記の打刻エラーが未修正のままです。\n⚠️ 本日中に修正がない場合、給与計算に反映できないだけでなく、勤怠管理上の評価にも影響します。\n至急、KOTから打刻申請で修正してください。\n\n▼要修正の打刻エラー（{error_count}件）\n{error_list}\n\n【修正手順】\nタイムカード → 該当日の詳細 → 打刻申請 → 新規 → 申請メッセージ入力 → 申請\n\n対応が確認できない場合は、個別にご連絡します。',
         }
         tmpl = alert_templates.get(tmpl_key, default_templates.get(tmpl_key, ''))
 

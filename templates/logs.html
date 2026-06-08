@@ -55,10 +55,10 @@
         <tbody>
             {% for log in logs %}
             <tr>
-                <td style="white-space:nowrap">{{ log.alert_date[5:].replace('-', '/') if log.alert_date else '' }}</td>
-                <td>{{ log.employees.last_name if log.employees else '' }} {{ log.employees.first_name if log.employees else '' }}</td>
-                <td>{{ flow_labels.get(log.flow_type, log.flow_type) }}</td>
-                <td style="white-space:pre-wrap;word-break:break-all;font-size:13px">{{ log.message or '' }}</td>
+                <td data-label="日付" style="white-space:nowrap">{{ log.alert_date[5:].replace('-', '/') if log.alert_date else '' }}</td>
+                <td data-label="スタッフ">{{ log.employees.last_name if log.employees else '' }} {{ log.employees.first_name if log.employees else '' }}</td>
+                <td data-label="種別">{{ flow_labels.get(log.flow_type, log.flow_type) }}</td>
+                <td data-label="メッセージ" style="white-space:pre-wrap;word-break:break-all;font-size:13px">{{ log.message or '' }}</td>
             </tr>
             {% endfor %}
             {% if not logs %}
@@ -74,6 +74,15 @@
     .log-filter { flex-direction: column; align-items: stretch !important; }
     .log-filter span { display: none; }
     .log-filter select, .log-filter input, .log-filter .btn, .log-filter a { width: 100%; text-align: center; }
+}
+@media (max-width: 600px) {
+    .table-wrap table thead { display: none; }
+    .table-wrap table, .table-wrap table tbody, .table-wrap table tr, .table-wrap table td { display: block; width: 100%; }
+    .table-wrap table tr { border: 1px solid #ddd; border-radius: 6px; margin-bottom: 12px; padding: 10px 12px; background: #fff; }
+    .table-wrap table td { border-bottom: none; padding: 4px 0; font-size: 14px; }
+    .table-wrap table td::before { content: attr(data-label) ": "; font-weight: 600; color: #555; }
+    .table-wrap table td[data-label="メッセージ"] { margin-top: 4px; padding-top: 8px; border-top: 1px solid #eee; white-space: pre-wrap; word-break: break-word; }
+    .table-wrap table td[data-label="メッセージ"]::before { display: block; margin-bottom: 4px; }
 }
 </style>
 

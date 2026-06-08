@@ -1,13 +1,19 @@
-# kot-alert-lineworks 引き継ぎメモ（最終更新 2026-06-04）
+# kot-alert-lineworks 引き継ぎメモ（最終更新 2026-06-08）
 
 次チャット開始時にこのファイルを読めば現状を把握できるように維持する。詳細な実装記録は CLAUDE.md 側にある。
 
 ## 稼働中の機能
-1. **clock_error_reminder** — 朝8:00 cron、打刻エラー(isError)未対応者へDM＋段階督促。本番稼働中
+1. **clock_error_reminder** — 朝8:00 cron、打刻エラー(isError)未対応者へDM＋段階督促。本番稼働中。remind_count>=3 の最終段テンプレを「最終警告」文面に差し替え済み(commit 8983651, 2026-06-08)
 2. **break_warning** — 13:10、45分休憩(breakTime==45)検出→本人DM＋管理者まとめ掲載。2026-06-04本番化、初回手動送信5件完了・総務周知済み。詳細はCLAUDE.md「break_warning 実装プラン」参照
+3. **send_daily_report 冒頭リマインド** — 13:10管理グループまとめの冒頭に総務チェック前日/締め前日リマインドを差し込み(commit 29987fc, 2026-06-08)。jpholiday で祝日判定。既存まとめ本体・送信処理・二重送信ガードは無変更、1日1通のまま
+   - 14日 → 締め版「⚠️ 明日15日は勤怠の最終締め日です」（土日祝でも必ず送る）
+   - 月曜/水曜 かつ当日・翌日とも祝日でない → 定例版「📋 明日は総務による勤怠のチェック日です」
+   - 14日が月水と重なったら締め版を優先（定例は出さない）
+   - 本番デビュー: 定例版=次の水曜(06-10)から、締め版=毎月14日から
 
 ## 直近の観察ポイント
-- **2026-06-05 13:10 が break_warning の初回自動発火**。既送信5件(水津悠斗4・西口恵1)はwas_alert_sentガードでスキップ、前日06-04の新規該当者のみ本人DM＋管理者まとめ掲載されるはず。logs/cron.log で想定通りか確認したい
+- **2026-06-10(水) 13:10 が定例リマインドの初回自動発火**。まとめ冒頭に「📋 明日は総務による勤怠のチェック日です」が載るはず。logs/cron.log で確認
+- **2026-06-14 13:10 が締め版リマインドの初回自動発火**。まとめ冒頭に「⚠️ 明日15日は勤怠の最終締め日です」が載るはず
 
 ## 環境・アクセス
 - VPS: `ssh ubuntu@133.125.93.39` (port 22)、プロジェクト `/home/ubuntu/kot-alert-lineworks`、venv は venv/、`claude` はプロジェクトディレクトリで起動
@@ -16,7 +22,8 @@
 - 本番稼働: systemd `kot-alert.service` → `gunicorn --bind 127.0.0.1:5000 --workers 1 --timeout 120 --max-requests 500 app:app`
 - crontab 2行のみ: `0 8 * * *`(checker.py --clock-error) と `0,10,20,30,40,50 10-22 * * *`(checker.py 通常)
 - KOT APIブラックアウト: **17:30-18:30** と **8:30-10:00** JST（daily-workings が0件/403）。pytz未導入、時刻確認は `TZ=Asia/Tokyo date`
-- LINE WORKS ID は **UUID形式必須**（ログインID av.xxxxx@ 形式は送信不可）。UUIDは `GET /users/{loginId}` APIで取得（トークンに user.read スコープあり）
+- 依存: jpholiday 1.0.3（祝日判定、2026-06-08導入、requirements.txt追記済み）
+- LINE WORKS Bot送信: ログインID形式(av.xxxxx@, sakamoto.tatsuya@等)でもUUID形式でも送信成功する(200/201)。佐久間・吉武・坂本で確認済み(2026-06-08)。UUIDは `GET /users/{loginId}` APIで取得可（トークンに user.read スコープあり）
 
 ## 既知の課題（2026-06-04 調査済み）
 1. **datetime.fromisoformat Python3.10互換 — 部分対応**

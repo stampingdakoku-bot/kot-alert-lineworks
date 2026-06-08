@@ -4,3 +4,4 @@ supabase==2.28.2
 python-dotenv==1.2.2
 requests==2.32.5
 pyjwt[crypto]==2.12.1
+jpholiday==1.0.3

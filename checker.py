@@ -32,6 +32,7 @@ import kot_api
 import lw_api
 from lw_api import send_message, send_group_message
 import requests
+import jpholiday
 
 LW_GROUP_CHANNEL_ID = os.environ.get('LW_GROUP_CHANNEL_ID', '')
 
@@ -550,6 +551,24 @@ def send_daily_report(all_emps=None, yesterday_str=None):
         eks = problem_names.get(ft, set())
         return "、".join(sorted(_name(ek) for ek in eks))
 
+    # 総務チェック前日リマインド / 締め最終前日リマインド
+    today = datetime.now(JST).date()
+    tomorrow = today + timedelta(days=1)
+    reminder_lines = []
+    if today.day == 14:
+        reminder_lines = [
+            "⚠️ 明日15日は勤怠の最終締め日です",
+            "本日が修正対応の最終日となります。",
+            "お忙しいところ恐れ入りますが、スタッフの修正申請（打刻申請）の承認を、本日中に必ずお願いいたします。",
+        ]
+    elif today.weekday() in (0, 2):
+        if not jpholiday.is_holiday(today) and not jpholiday.is_holiday(tomorrow):
+            reminder_lines = [
+                "📋 明日は総務による勤怠のチェック日です",
+                "お忙しいところ恐れ入りますが、お手すきの際にスタッフの修正申請（打刻申請）のご承認をお願いできますと幸いです。",
+                "ご対応いただけますとスムーズにチェックを進められます。どうぞよろしくお願いいたします。",
+            ]
+
     lines = ["📊 前日勤怠まとめ（" + yesterday_str + "）", ""]
 
     for ft, label in [("late_clockin", "出勤打刻なし"), ("overtime", "超過警告")]:
@@ -615,6 +634,9 @@ def send_daily_report(all_emps=None, yesterday_str=None):
     lines.append("")
     lines.append("▶ 管理画面")
     lines.append("http://133.125.93.39/")
+
+    if reminder_lines:
+        lines = reminder_lines + [""] + lines
 
     message = "\n".join(lines)
     if lw_api.send_group_message(LW_GROUP_CHANNEL_ID, message):

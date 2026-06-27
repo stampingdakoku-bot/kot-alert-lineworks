@@ -3,9 +3,12 @@ kot-alert: データベース管理 (Supabase版)
 """
 import os
 import re
+import logging
 from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -38,13 +41,17 @@ def was_alert_sent(employee_key, flow_type, alert_date):
 
 
 def record_alert(employee_key, flow_type, alert_date, message=""):
-    supabase.table('alerts_sent').insert({
-        'employee_key': employee_key,
-        'flow_type': flow_type,
-        'alert_date': alert_date,
-        'sent_at': datetime.now().isoformat(),
-        'message': message
-    }).execute()
+    try:
+        supabase.table('alerts_sent').insert({
+            'employee_key': employee_key,
+            'flow_type': flow_type,
+            'alert_date': alert_date,
+            'sent_at': datetime.now().isoformat(),
+            'message': message
+        }).execute()
+    except Exception as e:
+        # FK制約違反(__admin__等)や一時的なDB障害でchecker全体を落とさない
+        logger.warning("record_alert失敗 (%s/%s): %s", employee_key, flow_type, e)
 
 
 def count_alerts_today(employee_key, flow_type, alert_date):

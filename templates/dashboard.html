@@ -85,17 +85,19 @@
             <tbody>
                 {% for staff in card.staff_scheduled %}
                 {% set is_in = staff.emp_key and staff.emp_key in (card.staff_clocked_in | map(attribute='emp_key') | list) %}
-                {% set clocked = None %}
+                {% set ns = namespace(out=None) %}
                 {% for c in card.staff_clocked_in %}
-                    {% if c.emp_key == staff.emp_key %}
-                        {% set clocked = c %}
+                    {% if c.emp_key == staff.emp_key and c.clock_out %}
+                        {% set ns.out = c.clock_out %}
                     {% endif %}
                 {% endfor %}
                 {% set is_not_clocked = staff.emp_key and staff.emp_key in (card.staff_not_clocked | map(attribute='emp_key') | list) %}
                 <tr>
                     <td style="text-align:center;font-size:22px">
-                        {% if is_in %}
-                            <span style="color:#27ae60" title="出勤済">●</span>
+                        {% if is_in and ns.out %}
+                            <span style="color:#3498db" title="退勤済">●</span>
+                        {% elif is_in %}
+                            <span style="color:#27ae60" title="出勤中">●</span>
                         {% elif is_not_clocked %}
                             <span style="color:#e74c3c" title="未打刻">●</span>
                         {% elif card.kot_blocked %}

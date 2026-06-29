@@ -14,7 +14,7 @@
       background: linear-gradient(160deg, #fdf2f8 0%, #f0f7ff 55%, #f5fbff 100%);
       background-attachment: fixed;
       color: #475569;
-      padding: clamp(12px, 2.5vw, 28px);
+      padding: clamp(12px, 2.5vw, 30px);
       min-height: 100vh;
     }
     .head {
@@ -42,10 +42,75 @@
       box-shadow: 0 2px 8px rgba(219,39,119,.08);
     }
     .head .trecole-link:hover { background: #fdf2f8; }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: clamp(10px, 2vw, 20px);
+      font-size: clamp(12px, 1.7vw, 17px); margin-bottom: 22px; color: #64748b;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex: none; }
+    .d-scheduled { background: #cbd5e1; }
+    .d-working   { background: #34d399; }
+    .d-done      { background: #818cf8; }
+
+    .company {
+      font-size: clamp(18px, 2.8vw, 27px); font-weight: 800; color: #0f766e;
+      margin: clamp(14px, 2.4vw, 26px) 0 12px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .company::before {
+      content: ""; width: 9px; height: clamp(20px, 2.6vw, 28px);
+      background: var(--bar, #94a3b8); border-radius: 4px;
+    }
+    .depts {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+      gap: clamp(13px, 1.7vw, 20px);
+      align-items: start;
+    }
+    .dept {
+      background: #ffffff; border-radius: 16px;
+      padding: clamp(10px, 1.2vw, 18px);
+      box-shadow: 0 4px 18px rgba(100, 116, 139, .10);
+    }
+    .dept h3 {
+      font-size: clamp(15px, 1.9vw, 21px); color: #334155; font-weight: 700;
+      margin-bottom: 9px; padding-bottom: 7px; border-bottom: 2px dashed #f1d5e6;
+      display: flex; align-items: baseline; gap: 7px;
+    }
+    .dept h3 .cnt { font-size: clamp(12px, 1.4vw, 16px); color: #db2777; font-weight: 600; }
+    .people {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 78px), 1fr));
+      gap: clamp(5px, .8vw, 10px);
+    }
+    .chip {
+      position: relative;
+      border-radius: 11px; padding: clamp(6px, .8vw, 12px) clamp(3px, .5vw, 8px);
+      text-align: center; background: #f8fafc; border: 2px solid #e2e8f0; min-width: 0;
+    }
+    .chip .name {
+      font-size: clamp(14px, 1.8vw, 24px); font-weight: 800; color: #334155;
+      line-height: 1.12; word-break: break-word;
+    }
+    .chip .time { font-size: clamp(10px, 1.2vw, 16px); color: #94a3b8; margin-top: 2px; }
+    .chip.working   { background: #ecfdf5; border-color: #34d399; box-shadow: 0 0 0 1px #34d399 inset; }
+    .chip.working .name { color: #059669; }
+    .chip.done      { background: #eef2ff; border-color: #c7d2fe; }
+    .chip.done .name { color: #6366f1; }
+    .chip.done .time { color: #a5b4fc; }
+    .chip.scheduled { background: #f8fafc; border-color: #e2e8f0; }
+    .badge-remote {
+      position: absolute; top: -8px; right: -6px;
+      font-size: clamp(11px, 1.3vw, 14px); line-height: 1.3;
+      background: #ede9fe;
+      padding: 2px 7px; border-radius: 999px; border: 1px solid #ddd6fe;
+      box-shadow: 0 1px 4px rgba(124,58,237,.15);
+    }
+    .empty { color: #cbd5e1; font-size: clamp(13px, 1.6vw, 17px); padding: 6px 0; }
 
     .datenav {
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-      margin-bottom: 14px;
+      margin-bottom: 18px;
     }
     .datenav a, .datenav input {
       font-family: inherit; font-size: clamp(13px, 1.6vw, 16px); font-weight: 600;
@@ -56,87 +121,22 @@
     .datenav a:hover { background: #fdf2f8; }
     .datenav a.today { background: #db2777; color: #fff; border-color: #db2777; }
     .datenav input { padding: 7px 12px; color: #334155; }
+    .datenav .spacer { flex: 1 1 auto; }
     .not-today {
       font-size: clamp(12px, 1.6vw, 16px); color: #db2777; font-weight: 700;
       background: #fdf2f8; padding: 5px 14px; border-radius: 999px;
     }
-
-    .legend {
-      display: flex; flex-wrap: wrap; gap: clamp(10px, 2vw, 20px);
-      font-size: clamp(12px, 1.7vw, 16px); margin-bottom: 16px; color: #64748b;
-    }
-    .legend span { display: inline-flex; align-items: center; gap: 7px; }
-    .dot { font-size: 15px; line-height: 1; }
-    .s-scheduled { color: #cbd5e1; }
-    .s-working   { color: #10b981; }
-    .s-done      { color: #6366f1; }
-
     .unmapped-note {
       background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
-      padding: 10px 16px; margin-bottom: 16px;
+      padding: 10px 16px; margin-bottom: 18px;
       font-size: clamp(12px, 1.6vw, 16px); color: #b45309;
     }
     .unmapped-note b { color: #92400e; }
-
-    .company {
-      font-size: clamp(18px, 2.8vw, 27px); font-weight: 800; color: #0f766e;
-      margin: clamp(14px, 2.4vw, 24px) 0 12px;
-      display: flex; align-items: center; gap: 10px;
-    }
-    .company::before {
-      content: ""; width: 9px; height: clamp(20px, 2.6vw, 28px);
-      background: var(--bar, #94a3b8); border-radius: 4px;
-    }
-    .depts {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
-      gap: clamp(13px, 1.7vw, 18px);
-      align-items: start;
-    }
-    .dept {
-      background: #ffffff; border-radius: 16px;
-      padding: clamp(12px, 1.3vw, 18px);
-      box-shadow: 0 4px 18px rgba(100, 116, 139, .10);
-    }
-    .dept h3 {
-      font-size: clamp(15px, 1.9vw, 20px); color: #334155; font-weight: 700;
-      margin-bottom: 8px; padding-bottom: 7px; border-bottom: 2px dashed #f1d5e6;
-      display: flex; align-items: baseline; gap: 8px;
-    }
-    .dept h3 .cnt { font-size: clamp(12px, 1.4vw, 15px); color: #db2777; font-weight: 600; }
-
-    table { width: 100%; border-collapse: collapse; }
-    tbody tr { border-bottom: 1px solid #f1f5f9; }
-    tbody tr:last-child { border-bottom: none; }
-    td { padding: clamp(6px, .8vw, 9px) 4px; vertical-align: middle; }
-    td.st { width: 24px; text-align: center; }
-    td.st .dot { font-size: clamp(15px, 1.8vw, 20px); }
-    td.nm {
-      font-size: clamp(15px, 1.9vw, 21px); font-weight: 800; color: #334155;
-      white-space: nowrap;
-    }
-    td.nm .home { font-size: .85em; margin-left: 3px; }
-    td.nm .um {
-      font-size: clamp(9px, 1.1vw, 11px); font-weight: 700; margin-left: 5px;
-      background: #fef3c7; color: #b45309; padding: 1px 7px; border-radius: 999px;
-      border: 1px solid #fde68a; vertical-align: middle;
-    }
-    td.sh {
-      font-size: clamp(12px, 1.4vw, 16px); color: #94a3b8; white-space: nowrap;
-      text-align: right;
-    }
-    td.stt {
-      font-size: clamp(12px, 1.5vw, 16px); white-space: nowrap; text-align: right;
-      font-weight: 700;
-    }
-    tr.r-working  td.nm { color: #059669; }
-    tr.r-working  td.stt { color: #059669; }
-    tr.r-done     td.stt { color: #6366f1; }
-    tr.r-scheduled td.stt { color: #cbd5e1; font-weight: 600; }
-    .empty { color: #cbd5e1; font-size: clamp(13px, 1.6vw, 17px); padding: 8px 2px; }
-
-    @media (max-width: 600px) {
-      .depts { grid-template-columns: 1fr; }
+    .badge-unmapped {
+      position: absolute; top: -8px; left: -6px;
+      font-size: clamp(9px, 1.1vw, 11px); font-weight: 700;
+      background: #fef3c7; color: #b45309;
+      padding: 2px 7px; border-radius: 999px; border: 1px solid #fde68a;
     }
   </style>
 </head>
@@ -157,9 +157,9 @@
   </div>
 
   <div class="legend">
-    <span><i class="dot s-working">●</i>出勤中</span>
-    <span><i class="dot s-scheduled">○</i>予定（未出勤）</span>
-    <span><i class="dot s-done">●</i>退勤済</span>
+    <span><i class="dot d-working"></i>出勤中</span>
+    <span><i class="dot d-scheduled"></i>予定（未出勤）</span>
+    <span><i class="dot d-done"></i>退勤済</span>
     <span>🏠 リモート</span>
   </div>
 
@@ -179,28 +179,16 @@
         <div class="dept">
           <h3>{{ d.dept }} <span class="cnt">{{ d.shifts|length }}名</span></h3>
           {% if d.shifts %}
-            <table>
-              <tbody>
+            <div class="people">
               {% for s in d.shifts %}
-                <tr class="r-{{ s.status }}">
-                  <td class="st">
-                    {% if s.status == 'working' %}<span class="dot s-working">●</span>
-                    {% elif s.status == 'done' %}<span class="dot s-done">●</span>
-                    {% else %}<span class="dot s-scheduled">○</span>{% endif %}
-                  </td>
-                  <td class="nm">
-                    {{ s.name }}{% if s.remote %}<span class="home" title="リモート">🏠</span>{% endif %}{% if s.unmapped %}<span class="um">未分類</span>{% endif %}
-                  </td>
-                  <td class="sh">{% if s.start %}{{ s.start }}–{{ s.end }}{% endif %}</td>
-                  <td class="stt">
-                    {% if s.status == 'working' %}出勤{% if s.clock_in %} {{ s.clock_in }}{% endif %}
-                    {% elif s.status == 'done' %}退勤済{% if s.clock_out %} {{ s.clock_out }}{% endif %}
-                    {% else %}予定{% endif %}
-                  </td>
-                </tr>
+                <div class="chip {{ s.status }}">
+                  {% if s.remote %}<span class="badge-remote" title="リモート">🏠</span>{% endif %}
+                  {% if s.unmapped %}<span class="badge-unmapped">未分類</span>{% endif %}
+                  <div class="name">{{ s.name }}</div>
+                  <div class="time">{% if s.start %}{{ s.start }}–{{ s.end }}{% endif %}</div>
+                </div>
               {% endfor %}
-              </tbody>
-            </table>
+            </div>
           {% else %}
             <div class="empty">本日のシフトなし</div>
           {% endif %}

@@ -148,13 +148,10 @@ def apply_today(groups, now):
     for g in groups:
         for s in g["shifts"]:
             scheduled.add(s["name"])
-            info = byln.get(s["name"], {})
-            s["clock_in"] = info.get("clock_in")
-            s["clock_out"] = info.get("clock_out")
             if s["name"] in neesa_lw.SCHEDULE_BASED_NAMES:
                 s["status"] = _schedule_status(s.get("start"), s.get("end"), now)
             else:
-                s["status"] = _status(info)
+                s["status"] = _status(byln.get(s["name"], {}))
 
     gmap = {(g["company"], g["dept"]): g for g in groups}
 
@@ -166,7 +163,6 @@ def apply_today(groups, now):
             return
         s = {"name": name, "start": None, "end": None, "summary": "打刻のみ",
              "remote": remote, "punch_only": True, "status": st,
-             "clock_in": info.get("clock_in"), "clock_out": info.get("clock_out"),
              "unmapped": name not in neesa_lw.DEPT_MAP}
         key = neesa_lw.DEPT_MAP.get(name, neesa_lw.DEFAULT_GROUP)
         if key not in gmap:
@@ -200,9 +196,7 @@ def apply_today(groups, now):
             gmap[key] = ng
         gmap[key]["shifts"].append({
             "name": disp, "start": None, "end": None, "summary": "",
-            "remote": False, "punch_only": True, "status": st,
-            "clock_in": info.get("clock_in"), "clock_out": info.get("clock_out"),
-            "unmapped": False})
+            "remote": False, "punch_only": True, "status": st, "unmapped": False})
         scheduled.add(disp)
 
     # 3) 宮崎など トレコレKoT で打刻する人を取得して追加

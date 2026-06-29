@@ -142,13 +142,21 @@ def apply_today(groups, now):
     twmap = {w["employeeKey"]: w.get("totalWork")
              for w in (dwd or {}).get("dailyWorkings", [])}
     byln = _build_lastname_map(emps, clock, twmap)
+    # フルネーム→打刻（旧姓等の別名解決 KOT_NAME_ALIAS 用）
+    byfull = {}
+    for e in emps:
+        full = e.get("lastName", "") + e.get("firstName", "")
+        c = clock.get(e.get("key", ""), {})
+        byfull[full] = {"clock_in": c.get("clock_in"), "clock_out": c.get("clock_out"),
+                        "total_work": twmap.get(e.get("key", ""))}
 
     # 1) スケジュール者に status 付与（山藤等は打刻無視でスケジュール緑）
     scheduled = set()
     for g in groups:
         for s in g["shifts"]:
             scheduled.add(s["name"])
-            info = byln.get(s["name"], {})
+            alias = neesa_lw.KOT_NAME_ALIAS.get(s["name"])
+            info = byfull.get(alias, {}) if alias else byln.get(s["name"], {})
             s["clock_in"] = info.get("clock_in")
             s["clock_out"] = info.get("clock_out")
             if s["name"] in neesa_lw.SCHEDULE_BASED_NAMES:

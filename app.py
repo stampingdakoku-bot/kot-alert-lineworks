@@ -889,5 +889,56 @@ def callback():
     return 'OK', 200
 
 
+@app.route('/board')
+def board():
+    """勤怠ボード（モニタ常時表示用キオスク画面・NeeSaカレンダー由来）
+    ?date=YYYY-MM-DD で前後±35日のシフトを閲覧可。当日のみKoTライブ色付け対象。"""
+    import neesa_lw
+    from collections import OrderedDict
+    now = datetime.now(JST)
+    today = now.date()
+    qd = (request.args.get('date') or '').strip()
+    try:
+        target = date.fromisoformat(qd) if qd else today
+    except ValueError:
+        target = today
+    # ±35日にクランプ
+    delta = (target - today).days
+    if delta > 35:
+        target = today + timedelta(days=35)
+    elif delta < -35:
+        target = today - timedelta(days=35)
+    is_today = (target == today)
+
+    groups = neesa_lw.get_today_shifts(target)
+    for g in groups:
+        for s in g['shifts']:
+            s.setdefault('status', 'scheduled')
+    # 当日のみ NeeSa KoT の打刻で色付け＋打刻のみ者を追加（過去/未来日は予定表示のまま）
+    if is_today:
+        try:
+            import neesa_kot
+            neesa_kot.apply_today(groups, now)
+        except Exception as e:
+            app.logger.warning('board KoT色付け失敗: %s', e)
+    companies = OrderedDict()
+    total = 0
+    for g in groups:
+        companies.setdefault(g['company'], []).append(g)
+        total += len(g['shifts'])
+
+    weekdays = ['月', '火', '水', '木', '金', '土', '日']
+    title = target.strftime('%Y/%m/%d') + '（' + weekdays[target.weekday()] + '）'
+    return render_template(
+        'board.html', companies=companies, total=total,
+        updated=now.strftime('%H:%M'), today=title, is_today=is_today,
+        target=target.isoformat(),
+        prev_day=(target - timedelta(days=1)).isoformat(),
+        next_day=(target + timedelta(days=1)).isoformat(),
+        prev_week=(target - timedelta(days=7)).isoformat(),
+        next_week=(target + timedelta(days=7)).isoformat(),
+    )
+
+
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000, debug=True)

@@ -173,7 +173,7 @@
             <div class="people">
               {% for s in d.shifts %}
                 <div class="chip {{ s.status }}">
-                  {% if s.remote %}<span class="badge-remote">🏠在宅</span>{% endif %}
+                  {% if s.remote %}<span class="badge-remote">🏠リモート</span>{% endif %}
                   {% if s.unmapped %}<span class="badge-unmapped">未分類</span>{% endif %}
                   <div class="name">{{ s.name }}</div>
                   <div class="time">{% if s.start %}{{ s.start }}–{{ s.end }}{% else %}打刻のみ{% endif %}</div>

@@ -177,6 +177,28 @@ def apply_today(groups, now):
         if info.get("clock_in") or (info.get("total_work") or 0) > 0:
             _add_punch_only(ln, info, remote=(ln in neesa_lw.REMOTE_NAMES))
 
+    # 2.5) 同姓回避フルネーム（大井蒼太→「蒼太」）。打刻があった日のみ別表示。
+    for e in emps:
+        full = e.get("lastName", "") + e.get("firstName", "")
+        spec = neesa_lw.KOT_EXTRA_FULLNAMES.get(full)
+        if not spec:
+            continue
+        disp, key = spec
+        c = clock.get(e.get("key", ""), {})
+        info = {"clock_in": c.get("clock_in"), "clock_out": c.get("clock_out"),
+                "total_work": twmap.get(e.get("key", ""))}
+        st = _status(info)
+        if st == "scheduled" or disp in scheduled:
+            continue  # 打刻も確定も無い／既出なら出さない
+        if key not in gmap:
+            ng = {"company": key[0], "dept": key[1], "shifts": []}
+            groups.append(ng)
+            gmap[key] = ng
+        gmap[key]["shifts"].append({
+            "name": disp, "start": None, "end": None, "summary": "",
+            "remote": False, "punch_only": True, "status": st, "unmapped": False})
+        scheduled.add(disp)
+
     # 3) 宮崎など トレコレKoT で打刻する人を取得して追加
     if neesa_lw.CROSS_KOT_NAMES:
         for ln, info in _trecole_status(neesa_lw.CROSS_KOT_NAMES, date_str).items():

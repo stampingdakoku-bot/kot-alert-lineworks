@@ -62,7 +62,6 @@ DEPT_MAP = {
     "岩本": ("NeeSa", "発送"),
     "田邊": ("NeeSa", "発送"),
     "大井": ("NeeSa", "発送"),
-    "大井蒼汰": ("NeeSa", "発送"),
     "石光": ("NeeSa", "発送"),
     "井沢": ("NeeSa", "発送"),
     "工藤": ("NeeSa", "発送"),
@@ -83,7 +82,12 @@ REMOTE_NAMES = {"梅津", "須賀", "三鹿"}  # リモート勤務者
 EXCLUDE_NAMES = {"藤原", "佐々木", "有重", "伊藤", "曽我部"}
 
 # 同姓の曖昧さ回避: カレンダー名(lastName) → 採用するKoTフルネーム
+# 「大井」はスケジュールを持つ大井夏美を指す。同姓の大井蒼太はスケジュールが
+# 無いため下の KOT_EXTRA_FULLNAMES で「蒼太」として打刻時のみ別表示する。
 KOT_FULLNAME = {"大井": "大井夏美"}
+# KoTフルネーム → (表示名, (会社, 部署))。姓だけだと同姓と衝突する人を、
+# KoT打刻があった日のみ別表示名で出す（例: 大井蒼太 → 「蒼太」を発送へ）。
+KOT_EXTRA_FULLNAMES = {"大井蒼太": ("蒼太", ("NeeSa", "発送"))}
 # 打刻が特殊な人: KoT打刻でなくLINEスケジュールの時間で状態判定
 # （開始前=予定 / 時間内=出勤中 / 終了後=退勤済）
 SCHEDULE_BASED_NAMES = {"山藤"}
@@ -150,6 +154,23 @@ _SHIFT_RE = re.compile(
 )
 
 
+def _fmt_time(t):
+    """'1530'->'15:30', '9'->'9:00', '930'->'9:30', '9:30'->'9:30'。
+    数字以外はそのまま返す。"""
+    if not t:
+        return t
+    s = t.replace(":", "")
+    if not s.isdigit():
+        return t
+    if len(s) <= 2:
+        h, m = int(s), 0
+    elif len(s) == 3:
+        h, m = int(s[0]), int(s[1:])
+    else:
+        h, m = int(s[:2]), int(s[2:])
+    return "%d:%02d" % (h, m)
+
+
 def parse_shift(summary):
     """シフトsummaryを解析。時間レンジ形式のみシフトとみなす。
     返り値: dict(name, start, end) / 非シフト(休み・有給等)は None"""
@@ -158,7 +179,7 @@ def parse_shift(summary):
     m = _SHIFT_RE.match(summary.strip())
     if not m:
         return None
-    start, end, name = m.group(1), m.group(2), m.group(3).strip()
+    start, end, name = _fmt_time(m.group(1)), _fmt_time(m.group(2)), m.group(3).strip()
     # 「@121」「＠121」マーカー（語尾等）を検出して名前から除去
     at121 = ("@121" in name) or ("＠121" in name)
     if at121:

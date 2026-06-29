@@ -19,21 +19,22 @@
     }
     .head {
       display: flex; flex-wrap: wrap; align-items: baseline;
-      gap: clamp(8px, 2vw, 22px);
-      padding-bottom: 14px; margin-bottom: 20px;
+      gap: clamp(7px, 1.6vw, 16px);
+      padding-bottom: 9px; margin-bottom: 14px;
       border-bottom: 3px solid #fbcfe8;
     }
     .head h1 {
-      font-size: clamp(21px, 3.4vw, 34px); font-weight: 800;
-      color: #db2777; letter-spacing: .04em;
+      font-size: clamp(20px, 3.2vw, 32px); font-weight: 800;
+      color: #db2777; letter-spacing: .04em; white-space: nowrap;
     }
-    .head .date { font-size: clamp(15px, 2.6vw, 25px); color: #64748b; font-weight: 600; }
-    .head .updated {
-      margin-left: auto; font-size: clamp(13px, 1.9vw, 19px); color: #94a3b8;
-      background: #fff; padding: 6px 14px; border-radius: 999px;
-      box-shadow: 0 2px 8px rgba(219,39,119,.08);
+    .head h1 .count {
+      font-size: clamp(13px, 2vw, 19px); font-weight: 700; color: #db2777;
+      background: #fdf2f8; padding: 3px 12px; border-radius: 999px;
+      margin-left: 9px; vertical-align: middle; letter-spacing: 0;
     }
+    .head .date { font-size: clamp(14px, 2.4vw, 24px); color: #64748b; font-weight: 600; }
     .head .trecole-link {
+      margin-left: auto;
       font-size: clamp(11px, 1.5vw, 14px); font-weight: 700;
       color: #db2777; text-decoration: none;
       background: #fff; padding: 5px 13px; border-radius: 999px;
@@ -139,9 +140,8 @@
 </head>
 <body>
   <div class="head">
-    <h1>勤怠ボード</h1>
+    <h1>勤怠ボード<span class="count">本日 {{ total }}名</span></h1>
     <div class="date">{{ today }}</div>
-    <div class="updated">本日 {{ total }}名 ／ 更新 {{ updated }}</div>
     <a class="trecole-link" href="/">トレコレ勤怠 ▸</a>
   </div>
 

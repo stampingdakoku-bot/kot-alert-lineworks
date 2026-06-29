@@ -46,17 +46,29 @@ DEPT_MAP = {
     "河村": ("NeeSa", "SNS部"),
     "三鹿": ("NeeSa", "WEBデザイン"),
     "濵口": ("NeeSa", "WEBデザイン"),
+    "兼田": ("NeeSa", "総務部"),
     "佐藤": ("NeeSa", "商品管理"),
     "矢垰": ("NeeSa", "商品管理"),
     "松田": ("NeeSa", "商品管理"),
     "田中": ("NeeSa", "商品管理"),
+    "杉村": ("NeeSa", "商品管理"),
+    # 発送（既知メンバー。未登録者は既定で発送＋未マッピング通知）
+    "加藤": ("NeeSa", "発送"),
+    "奥西": ("NeeSa", "発送"),
+    "岩本": ("NeeSa", "発送"),
+    "田邊": ("NeeSa", "発送"),
+    "大井": ("NeeSa", "発送"),
+    "石光": ("NeeSa", "発送"),
+    "井沢": ("NeeSa", "発送"),
     "山藤": ("アソビバスターズ", "アソビバスターズ発送"),
     "宮崎": ("アソビバスターズ", "アソビバスターズ発送"),  # トレコレKoTから取得
 }
-DEFAULT_GROUP = ("NeeSa", "AceCosme発送")
+DEFAULT_GROUP = ("NeeSa", "発送")
 AT121_GROUP = ("ディアメント", "@121")  # 「@121」マーカー付きシフトの行き先
-DEPT_ORDER = ["総務部", "SNS部", "WEBデザイン", "商品管理", "AceCosme発送",
+DEPT_ORDER = ["総務部", "SNS部", "WEBデザイン", "商品管理", "発送",
               "@121", "アソビバスターズ発送"]
+# 対象者ゼロでも枠を常時表示する(会社, 部署)
+ALWAYS_SHOW = [("ディアメント", "@121")]
 COMPANY_ORDER = ["NeeSa", "ディアメント", "アソビバスターズ"]
 REMOTE_NAMES = {"梅津"}  # リモート勤務者
 # ボードに出さない人（退職・別管理・表示不要など）
@@ -64,8 +76,9 @@ EXCLUDE_NAMES = {"藤原", "佐々木", "有重", "伊藤", "曽我部"}
 
 # 同姓の曖昧さ回避: カレンダー名(lastName) → 採用するKoTフルネーム
 KOT_FULLNAME = {"大井": "大井夏美"}
-# 打刻が特殊な人: スケジュールがあれば打刻に関係なく出勤中(緑)にする
-SCHEDULE_GREEN_NAMES = {"山藤"}
+# 打刻が特殊な人: KoT打刻でなくLINEスケジュールの時間で状態判定
+# （開始前=予定 / 時間内=出勤中 / 終了後=退勤済）
+SCHEDULE_BASED_NAMES = {"山藤"}
 # NeeSa KoTではなくトレコレKoT(既存KOT_TOKEN)で打刻する人 → 当日打刻で表示
 CROSS_KOT_NAMES = {"宮崎"}
 
@@ -213,13 +226,22 @@ def get_today_shifts(target_date=None):
             seen.setdefault(parsed["name"], parsed)
 
     # 名前 → (会社, 部署) で振り分け。@121マーカー付きは上書きで@121へ。
+    # DEPT_MAP未登録(既定の発送行き)は unmapped=True で通知対象にする。
     grouped = {}
     for name, s in seen.items():
         if s.get("at121"):
             key = AT121_GROUP
+            s["unmapped"] = False
+        elif name in DEPT_MAP:
+            key = DEPT_MAP[name]
+            s["unmapped"] = False
         else:
-            key = DEPT_MAP.get(name, DEFAULT_GROUP)
+            key = DEFAULT_GROUP
+            s["unmapped"] = True
         grouped.setdefault(key, []).append(s)
+    # 対象ゼロでも常時表示する枠を確保
+    for cd in ALWAYS_SHOW:
+        grouped.setdefault(cd, [])
 
     def _sort_key(item):
         (company, dept), _ = item

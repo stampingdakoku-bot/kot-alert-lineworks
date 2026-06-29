@@ -52,6 +52,37 @@ def _status(info):
     return "scheduled"
 
 
+def _to_minutes(t):
+    """'9'->540, '930'->570, '9:30'->570, '1015'->615 / 解析不能はNone"""
+    if not t:
+        return None
+    s = t.replace(":", "")
+    if not s.isdigit():
+        return None
+    if len(s) <= 2:
+        h, m = int(s), 0
+    elif len(s) == 3:
+        h, m = int(s[0]), int(s[1:])
+    else:
+        h, m = int(s[:2]), int(s[2:])
+    return h * 60 + m
+
+
+def _schedule_status(start, end, now):
+    """KoT打刻でなくシフト時間で状態判定（山藤等の特殊打刻向け）。
+    開始前=scheduled / 時間内=working / 終了後=done"""
+    sm = _to_minutes(start)
+    em = _to_minutes(end)
+    nowm = now.hour * 60 + now.minute
+    if sm is None:
+        return "working"
+    if nowm < sm:
+        return "scheduled"
+    if em is not None and nowm >= em:
+        return "done"
+    return "working"
+
+
 def _build_lastname_map(emps, clock, twmap):
     """lastName -> {clock_in, clock_out, total_work}。
     KOT_FULLNAME指定の同姓は該当フルネームのみ採用。それ以外の同姓は打刻ありを優先。"""
@@ -117,8 +148,8 @@ def apply_today(groups, now):
     for g in groups:
         for s in g["shifts"]:
             scheduled.add(s["name"])
-            if s["name"] in neesa_lw.SCHEDULE_GREEN_NAMES:
-                s["status"] = "working"
+            if s["name"] in neesa_lw.SCHEDULE_BASED_NAMES:
+                s["status"] = _schedule_status(s.get("start"), s.get("end"), now)
             else:
                 s["status"] = _status(byln.get(s["name"], {}))
 
@@ -131,7 +162,8 @@ def apply_today(groups, now):
         if st == "scheduled":  # 打刻も確定も無いなら出さない
             return
         s = {"name": name, "start": None, "end": None, "summary": "打刻のみ",
-             "remote": remote, "punch_only": True, "status": st}
+             "remote": remote, "punch_only": True, "status": st,
+             "unmapped": name not in neesa_lw.DEPT_MAP}
         key = neesa_lw.DEPT_MAP.get(name, neesa_lw.DEFAULT_GROUP)
         if key not in gmap:
             ng = {"company": key[0], "dept": key[1], "shifts": []}

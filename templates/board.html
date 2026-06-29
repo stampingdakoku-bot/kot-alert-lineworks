@@ -117,6 +117,18 @@
       font-size: clamp(12px, 1.6vw, 16px); color: #db2777; font-weight: 700;
       background: #fdf2f8; padding: 5px 14px; border-radius: 999px;
     }
+    .unmapped-note {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
+      padding: 10px 16px; margin-bottom: 18px;
+      font-size: clamp(12px, 1.6vw, 16px); color: #b45309;
+    }
+    .unmapped-note b { color: #92400e; }
+    .badge-unmapped {
+      position: absolute; top: -8px; left: -6px;
+      font-size: clamp(9px, 1.1vw, 11px); font-weight: 700;
+      background: #fef3c7; color: #b45309;
+      padding: 2px 7px; border-radius: 999px; border: 1px solid #fde68a;
+    }
   </style>
 </head>
 <body>
@@ -145,6 +157,14 @@
     <span>🏠 リモート</span>
   </div>
 
+  {% if unmapped %}
+  <div class="unmapped-note">
+    ⚠️ <b>未マッピング（既定の「発送」に表示中）:</b>
+    {{ unmapped | join('、') }}
+    — 所属部署が決まっていれば登録してください
+  </div>
+  {% endif %}
+
   {% for company, depts in companies.items() %}
     <div class="company">{{ company }}</div>
     <div class="depts">
@@ -156,6 +176,7 @@
               {% for s in d.shifts %}
                 <div class="chip {{ s.status }}">
                   {% if s.remote %}<span class="badge-remote">🏠在宅</span>{% endif %}
+                  {% if s.unmapped %}<span class="badge-unmapped">未分類</span>{% endif %}
                   <div class="name">{{ s.name }}</div>
                   <div class="time">{% if s.start %}{{ s.start }}–{{ s.end }}{% else %}打刻のみ{% endif %}</div>
                 </div>

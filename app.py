@@ -926,11 +926,14 @@ def board():
     for g in groups:
         companies.setdefault(g['company'], []).append(g)
         total += len(g['shifts'])
+    # 未マッピング者（既定の発送に表示中）を通知用に収集
+    unmapped = sorted({s['name'] for g in groups for s in g['shifts']
+                       if s.get('unmapped')})
 
     weekdays = ['月', '火', '水', '木', '金', '土', '日']
     title = target.strftime('%Y/%m/%d') + '（' + weekdays[target.weekday()] + '）'
     return render_template(
-        'board.html', companies=companies, total=total,
+        'board.html', companies=companies, total=total, unmapped=unmapped,
         updated=now.strftime('%H:%M'), today=title, is_today=is_today,
         target=target.isoformat(),
         prev_day=(target - timedelta(days=1)).isoformat(),

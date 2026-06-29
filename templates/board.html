@@ -9,192 +9,191 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; overflow-x: hidden; }
     body {
-      font-family: "Hiragino Maru Gothic ProN", "Hiragino Kaku Gothic ProN",
-                   "Yu Gothic UI", Meiryo, sans-serif;
-      background: linear-gradient(160deg, #fdf2f8 0%, #f0f7ff 55%, #f5fbff 100%);
-      background-attachment: fixed;
-      color: #475569;
-      padding: clamp(12px, 2.5vw, 30px);
-      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f5; color: #333;
     }
-    .head {
-      display: flex; flex-wrap: wrap; align-items: baseline;
-      gap: clamp(7px, 1.6vw, 16px);
-      padding-bottom: 9px; margin-bottom: 14px;
-      border-bottom: 3px solid #fbcfe8;
-    }
-    .head h1 {
-      font-size: clamp(20px, 3.2vw, 32px); font-weight: 800;
-      color: #db2777; letter-spacing: .04em; white-space: nowrap;
-    }
-    .head h1 .count {
-      font-size: clamp(13px, 2vw, 19px); font-weight: 700; color: #db2777;
-      background: #fdf2f8; padding: 3px 12px; border-radius: 999px;
-      margin-left: 9px; vertical-align: middle; letter-spacing: 0;
-    }
-    .head .date { font-size: clamp(14px, 2.4vw, 24px); color: #64748b; font-weight: 600; }
-    .head .trecole-link {
-      margin-left: auto;
-      font-size: clamp(11px, 1.5vw, 14px); font-weight: 700;
-      color: #db2777; text-decoration: none;
-      background: #fff; padding: 5px 13px; border-radius: 999px;
-      border: 1px solid #fbcfe8; white-space: nowrap;
-      box-shadow: 0 2px 8px rgba(219,39,119,.08);
-    }
-    .head .trecole-link:hover { background: #fdf2f8; }
-    .legend {
-      display: flex; flex-wrap: wrap; gap: clamp(10px, 2vw, 20px);
-      font-size: clamp(12px, 1.7vw, 17px); margin-bottom: 22px; color: #64748b;
-    }
-    .legend span { display: inline-flex; align-items: center; gap: 7px; }
-    .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex: none; }
-    .d-scheduled { background: #cbd5e1; }
-    .d-working   { background: #34d399; }
-    .d-done      { background: #818cf8; }
 
+    /* ===== トップバー（トレコレ管理画面のナビと同色） ===== */
+    nav {
+      background: #2c3e50; padding: 12px 24px;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    }
+    nav .brand { font-weight: bold; font-size: clamp(16px, 2.4vw, 20px); color: #3498db; }
+    nav .count {
+      font-size: clamp(12px, 1.7vw, 15px); font-weight: 600; color: #fff;
+      background: #34495e; padding: 3px 12px; border-radius: 10px;
+    }
+    nav .trecole-link {
+      margin-left: auto; font-size: clamp(12px, 1.6vw, 14px);
+      color: #fff; text-decoration: none; background: #3498db;
+      padding: 7px 14px; border-radius: 4px; white-space: nowrap;
+    }
+    nav .trecole-link:hover { opacity: .85; }
+
+    .container { max-width: 1200px; margin: 20px auto; padding: 0 24px; }
+
+    /* ===== 日付ナビ ===== */
+    .datenav {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      margin-bottom: 14px;
+    }
+    .datenav a, .datenav input {
+      font-family: inherit; font-size: 13px; color: #333; text-decoration: none;
+      background: #ecf0f1; padding: 8px 14px; border-radius: 4px; border: none;
+    }
+    .datenav a:hover { background: #dfe6e9; }
+    .datenav a.today { background: #3498db; color: #fff; }
+    .datenav input { background: #fff; border: 1px solid #ddd; padding: 7px 10px; }
+    .not-today {
+      font-size: 13px; color: #fff; font-weight: 600;
+      background: #f39c12; padding: 5px 12px; border-radius: 10px;
+    }
+
+    /* ===== 凡例 ===== */
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 16px;
+      font-size: 13px; margin-bottom: 16px; color: #666;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { font-size: 14px; line-height: 1; }
+    .c-working   { color: #27ae60; }
+    .c-done      { color: #3498db; }
+    .c-scheduled { color: #95a5a6; }
+
+    .unmapped-note {
+      background: #fff3cd; color: #856404; border-radius: 8px;
+      padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+    }
+    .unmapped-note b { color: #664d03; }
+
+    /* ===== 会社見出し ===== */
     .company {
-      font-size: clamp(18px, 2.8vw, 27px); font-weight: 800; color: #0f766e;
-      margin: clamp(14px, 2.4vw, 26px) 0 12px;
-      display: flex; align-items: center; gap: 10px;
+      font-size: clamp(16px, 2.4vw, 20px); font-weight: bold; color: #2c3e50;
+      margin: clamp(12px, 2vw, 22px) 0 10px;
+      display: flex; align-items: center; gap: 9px;
     }
     .company::before {
-      content: ""; width: 9px; height: clamp(20px, 2.6vw, 28px);
-      background: var(--bar, #94a3b8); border-radius: 4px;
+      content: ""; width: 6px; height: clamp(18px, 2.2vw, 24px);
+      background: var(--bar, #95a5a6); border-radius: 3px;
     }
+
+    /* ===== 部署カード ===== */
     .depts {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
-      gap: clamp(13px, 1.7vw, 20px);
-      align-items: start;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+      gap: 16px; align-items: start;
     }
     .dept {
-      background: #ffffff; border-radius: 16px;
-      padding: clamp(10px, 1.2vw, 18px);
-      box-shadow: 0 4px 18px rgba(100, 116, 139, .10);
+      background: #fff; border-radius: 8px; padding: 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .dept h3 {
-      font-size: clamp(15px, 1.9vw, 21px); color: #334155; font-weight: 700;
-      margin-bottom: 9px; padding-bottom: 7px; border-bottom: 2px dashed #f1d5e6;
-      display: flex; align-items: baseline; gap: 7px;
+      font-size: 16px; color: #2c3e50; font-weight: 600;
+      margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px;
     }
-    .dept h3 .cnt { font-size: clamp(12px, 1.4vw, 16px); color: #db2777; font-weight: 600; }
+    .dept h3 .cnt { font-size: 12px; color: #999; font-weight: 600; }
+
     .people {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 78px), 1fr));
-      gap: clamp(5px, .8vw, 10px);
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 80px), 1fr));
+      gap: 8px;
     }
     .chip {
       position: relative;
-      border-radius: 11px; padding: clamp(6px, .8vw, 12px) clamp(3px, .5vw, 8px);
-      text-align: center; background: #f8fafc; border: 2px solid #e2e8f0; min-width: 0;
+      background: #f8f9fa; border: 1px solid #e6e9ec; border-radius: 6px;
+      border-top: 3px solid #bdc3c7;
+      padding: 9px 4px 7px; text-align: center; min-width: 0;
     }
     .chip .name {
-      font-size: clamp(14px, 1.8vw, 24px); font-weight: 800; color: #334155;
-      line-height: 1.12; word-break: break-word;
+      font-size: clamp(13px, 1.7vw, 18px); font-weight: bold; color: #2c3e50;
+      line-height: 1.15; word-break: break-word;
     }
-    .chip .time { font-size: clamp(10px, 1.2vw, 16px); color: #94a3b8; margin-top: 2px; }
-    .chip.working   { background: #ecfdf5; border-color: #34d399; box-shadow: 0 0 0 1px #34d399 inset; }
-    .chip.working .name { color: #059669; }
-    .chip.done      { background: #eef2ff; border-color: #c7d2fe; }
-    .chip.done .name { color: #6366f1; }
-    .chip.done .time { color: #a5b4fc; }
-    .chip.scheduled { background: #f8fafc; border-color: #e2e8f0; }
+    .chip .time { font-size: 11px; color: #95a5a6; margin-top: 2px; }
+    .chip.working   { border-top-color: #27ae60; }
+    .chip.working .name { color: #27ae60; }
+    .chip.done      { border-top-color: #3498db; }
+    .chip.done .name { color: #3498db; }
+    .chip.done .time { color: #aac8e0; }
+    .chip.scheduled { border-top-color: #bdc3c7; }
+
     .badge-remote {
       position: absolute; top: -8px; right: -6px;
-      font-size: clamp(11px, 1.3vw, 14px); line-height: 1.3;
-      background: #ede9fe;
-      padding: 2px 7px; border-radius: 999px; border: 1px solid #ddd6fe;
-      box-shadow: 0 1px 4px rgba(124,58,237,.15);
+      font-size: 12px; line-height: 1.2;
+      background: #ecf0f1; border: 1px solid #d6dbdf;
+      padding: 1px 6px; border-radius: 10px;
     }
-    .empty { color: #cbd5e1; font-size: clamp(13px, 1.6vw, 17px); padding: 6px 0; }
-
-    .datenav {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-      margin-bottom: 18px;
-    }
-    .datenav a, .datenav input {
-      font-family: inherit; font-size: clamp(13px, 1.6vw, 16px); font-weight: 600;
-      color: #475569; background: #fff; text-decoration: none;
-      padding: 8px 14px; border-radius: 999px; border: 1px solid #e9d5e7;
-      box-shadow: 0 1px 5px rgba(219,39,119,.06);
-    }
-    .datenav a:hover { background: #fdf2f8; }
-    .datenav a.today { background: #db2777; color: #fff; border-color: #db2777; }
-    .datenav input { padding: 7px 12px; color: #334155; }
-    .datenav .spacer { flex: 1 1 auto; }
-    .not-today {
-      font-size: clamp(12px, 1.6vw, 16px); color: #db2777; font-weight: 700;
-      background: #fdf2f8; padding: 5px 14px; border-radius: 999px;
-    }
-    .unmapped-note {
-      background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px;
-      padding: 10px 16px; margin-bottom: 18px;
-      font-size: clamp(12px, 1.6vw, 16px); color: #b45309;
-    }
-    .unmapped-note b { color: #92400e; }
     .badge-unmapped {
       position: absolute; top: -8px; left: -6px;
-      font-size: clamp(9px, 1.1vw, 11px); font-weight: 700;
-      background: #fef3c7; color: #b45309;
-      padding: 2px 7px; border-radius: 999px; border: 1px solid #fde68a;
+      font-size: 10px; font-weight: 600;
+      background: #fff3cd; color: #856404; border: 1px solid #ffe69c;
+      padding: 1px 6px; border-radius: 10px;
+    }
+    .empty { color: #bbb; font-size: 14px; padding: 6px 0; }
+
+    @media (max-width: 768px) {
+      .container { padding: 0 12px; margin: 14px auto; }
+      .dept { padding: 14px; }
     }
   </style>
 </head>
 <body>
-  <div class="head">
-    <h1>勤怠ボード<span class="count">本日 {{ total }}名</span></h1>
-    <div class="date">{{ today }}</div>
+  <nav>
+    <span class="brand">勤怠ボード</span>
+    <span class="count">本日 {{ total }}名</span>
     <a class="trecole-link" href="/">トレコレ勤怠 ▸</a>
-  </div>
+  </nav>
 
-  <div class="datenav">
-    <a href="?date={{ prev_day }}">◀ 前日</a>
-    <a href="/board" class="today">今日</a>
-    <a href="?date={{ next_day }}">翌日 ▶</a>
-    <input type="date" value="{{ target }}"
-           onchange="if(this.value)location.href='?date='+this.value">
-    {% if not is_today %}<span class="not-today">過去/未来の予定（色は当日のみ）</span>{% endif %}
-  </div>
-
-  <div class="legend">
-    <span><i class="dot d-working"></i>出勤中</span>
-    <span><i class="dot d-scheduled"></i>予定（未出勤）</span>
-    <span><i class="dot d-done"></i>退勤済</span>
-    <span>🏠 リモート</span>
-  </div>
-
-  {% if unmapped %}
-  <div class="unmapped-note">
-    ⚠️ <b>未マッピング（既定の「発送」に表示中）:</b>
-    {{ unmapped | join('、') }}
-    — 所属部署が決まっていれば登録してください
-  </div>
-  {% endif %}
-
-  {% set barcolors = {'NeeSa': '#3b82f6', 'アソビバスターズ': '#22c55e', 'ディアメント': '#ef4444'} %}
-  {% for company, depts in companies.items() %}
-    <div class="company" style="--bar: {{ barcolors.get(company, '#94a3b8') }}">{{ company }}</div>
-    <div class="depts">
-      {% for d in depts %}
-        <div class="dept">
-          <h3>{{ d.dept }} <span class="cnt">{{ d.shifts|length }}名</span></h3>
-          {% if d.shifts %}
-            <div class="people">
-              {% for s in d.shifts %}
-                <div class="chip {{ s.status }}">
-                  {% if s.remote %}<span class="badge-remote" title="リモート">🏠</span>{% endif %}
-                  {% if s.unmapped %}<span class="badge-unmapped">未分類</span>{% endif %}
-                  <div class="name">{{ s.name }}</div>
-                  <div class="time">{% if s.start %}{{ s.start }}–{{ s.end }}{% endif %}</div>
-                </div>
-              {% endfor %}
-            </div>
-          {% else %}
-            <div class="empty">本日のシフトなし</div>
-          {% endif %}
-        </div>
-      {% endfor %}
+  <div class="container">
+    <div class="datenav">
+      <a href="?date={{ prev_day }}">◀ 前日</a>
+      <a href="/board" class="today">今日</a>
+      <a href="?date={{ next_day }}">翌日 ▶</a>
+      <input type="date" value="{{ target }}"
+             onchange="if(this.value)location.href='?date='+this.value">
+      <span style="font-size:13px;color:#999;margin-left:4px">{{ today }}</span>
+      {% if not is_today %}<span class="not-today">過去/未来の予定（色は当日のみ）</span>{% endif %}
     </div>
-  {% endfor %}
+
+    <div class="legend">
+      <span><i class="dot c-working">●</i>出勤中</span>
+      <span><i class="dot c-scheduled">○</i>予定（未出勤）</span>
+      <span><i class="dot c-done">●</i>退勤済</span>
+      <span>🏠 リモート</span>
+    </div>
+
+    {% if unmapped %}
+    <div class="unmapped-note">
+      ⚠️ <b>未マッピング（既定の「発送」に表示中）:</b>
+      {{ unmapped | join('、') }}
+      — 所属部署が決まっていれば登録してください
+    </div>
+    {% endif %}
+
+    {% set barcolors = {'NeeSa': '#3498db', 'アソビバスターズ': '#27ae60', 'ディアメント': '#e74c3c'} %}
+    {% for company, depts in companies.items() %}
+      <div class="company" style="--bar: {{ barcolors.get(company, '#95a5a6') }}">{{ company }}</div>
+      <div class="depts">
+        {% for d in depts %}
+          <div class="dept">
+            <h3>{{ d.dept }} <span class="cnt">{{ d.shifts|length }}名</span></h3>
+            {% if d.shifts %}
+              <div class="people">
+                {% for s in d.shifts %}
+                  <div class="chip {{ s.status }}">
+                    {% if s.remote %}<span class="badge-remote" title="リモート">🏠</span>{% endif %}
+                    {% if s.unmapped %}<span class="badge-unmapped">未分類</span>{% endif %}
+                    <div class="name">{{ s.name }}</div>
+                    <div class="time">{% if s.start %}{{ s.start }}–{{ s.end }}{% endif %}</div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty">本日のシフトなし</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
 </body>
 </html>

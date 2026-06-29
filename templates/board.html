@@ -190,15 +190,9 @@
                   <td class="nm">{{ s.name }}{% if s.remote %}<span class="home" title="リモート">🏠</span>{% endif %}{% if s.unmapped %}<span class="um">未分類</span>{% endif %}</td>
                   <td class="sh">{% if s.start %}{{ s.start }}–{{ s.end }}{% else %}—{% endif %}</td>
                   <td class="stt">
-                    {% if s.status == 'working' %}
-                      <span style="color:#27ae60">出勤{% if s.clock_in %} {{ s.clock_in }}{% endif %}</span>
-                    {% elif s.status == 'done' %}
-                      {% if s.clock_in %}<span style="color:#27ae60">出勤 {{ s.clock_in }}</span>{% endif %}
-                      {% if s.clock_out %}<span style="color:#3498db;margin-left:4px">退勤 {{ s.clock_out }}</span>
-                      {% elif not s.clock_in %}<span style="color:#3498db">退勤済</span>{% endif %}
-                    {% else %}
-                      <span style="color:#95a5a6">—</span>
-                    {% endif %}
+                    {% if s.status == 'working' %}<span style="color:#27ae60">出勤中</span>
+                    {% elif s.status == 'done' %}<span style="color:#3498db">退勤済</span>
+                    {% else %}<span style="color:#95a5a6">—</span>{% endif %}
                   </td>
                 </tr>
                 {% endfor %}

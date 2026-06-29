@@ -49,8 +49,8 @@
       display: flex; align-items: center; gap: 10px;
     }
     .company::before {
-      content: ""; width: 8px; height: clamp(20px, 2.6vw, 28px);
-      background: linear-gradient(#5eead4, #2dd4bf); border-radius: 4px;
+      content: ""; width: 9px; height: clamp(20px, 2.6vw, 28px);
+      background: var(--bar, #94a3b8); border-radius: 4px;
     }
     .depts {
       display: grid;
@@ -59,31 +59,31 @@
       align-items: start;
     }
     .dept {
-      background: #ffffff; border-radius: 18px;
-      padding: clamp(14px, 1.5vw, 20px);
+      background: #ffffff; border-radius: 16px;
+      padding: clamp(10px, 1.2vw, 18px);
       box-shadow: 0 4px 18px rgba(100, 116, 139, .10);
     }
     .dept h3 {
-      font-size: clamp(16px, 2vw, 22px); color: #334155; font-weight: 700;
-      margin-bottom: 12px; padding-bottom: 9px; border-bottom: 2px dashed #f1d5e6;
-      display: flex; align-items: baseline; gap: 8px;
+      font-size: clamp(15px, 1.9vw, 21px); color: #334155; font-weight: 700;
+      margin-bottom: 9px; padding-bottom: 7px; border-bottom: 2px dashed #f1d5e6;
+      display: flex; align-items: baseline; gap: 7px;
     }
-    .dept h3 .cnt { font-size: clamp(13px, 1.5vw, 17px); color: #db2777; font-weight: 600; }
+    .dept h3 .cnt { font-size: clamp(12px, 1.4vw, 16px); color: #db2777; font-weight: 600; }
     .people {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(100%, 144px), 1fr));
-      gap: clamp(8px, 1vw, 11px);
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 78px), 1fr));
+      gap: clamp(5px, .8vw, 10px);
     }
     .chip {
       position: relative;
-      border-radius: 14px; padding: clamp(10px, 1vw, 14px) 8px; text-align: center;
-      background: #f8fafc; border: 2px solid #e2e8f0; min-width: 0;
+      border-radius: 11px; padding: clamp(6px, .8vw, 12px) clamp(3px, .5vw, 8px);
+      text-align: center; background: #f8fafc; border: 2px solid #e2e8f0; min-width: 0;
     }
     .chip .name {
-      font-size: clamp(19px, 2.2vw, 27px); font-weight: 800; color: #334155;
-      line-height: 1.15; word-break: break-word;
+      font-size: clamp(14px, 1.8vw, 24px); font-weight: 800; color: #334155;
+      line-height: 1.12; word-break: break-word;
     }
-    .chip .time { font-size: clamp(13px, 1.5vw, 17px); color: #94a3b8; margin-top: 3px; }
+    .chip .time { font-size: clamp(10px, 1.2vw, 16px); color: #94a3b8; margin-top: 2px; }
     .chip.working   { background: #ecfdf5; border-color: #34d399; box-shadow: 0 0 0 1px #34d399 inset; }
     .chip.working .name { color: #059669; }
     .chip.done      { background: #eef2ff; border-color: #c7d2fe; }
@@ -139,15 +139,12 @@
   </div>
 
   <div class="datenav">
-    <a href="?date={{ prev_week }}">◀ 1週</a>
     <a href="?date={{ prev_day }}">◀ 前日</a>
     <a href="/board" class="today">今日</a>
     <a href="?date={{ next_day }}">翌日 ▶</a>
-    <a href="?date={{ next_week }}">1週 ▶</a>
     <input type="date" value="{{ target }}"
            onchange="if(this.value)location.href='?date='+this.value">
-    {% if not is_today %}<span class="not-today">過去/未来の予定を表示中（色は当日のみ）</span>{% endif %}
-    <span class="spacer"></span>
+    {% if not is_today %}<span class="not-today">過去/未来の予定（色は当日のみ）</span>{% endif %}
   </div>
 
   <div class="legend">
@@ -165,8 +162,9 @@
   </div>
   {% endif %}
 
+  {% set barcolors = {'NeeSa': '#3b82f6', 'アソビバスターズ': '#22c55e', 'ディアメント': '#ef4444'} %}
   {% for company, depts in companies.items() %}
-    <div class="company">{{ company }}</div>
+    <div class="company" style="--bar: {{ barcolors.get(company, '#94a3b8') }}">{{ company }}</div>
     <div class="depts">
       {% for d in depts %}
         <div class="dept">

@@ -43,18 +43,24 @@ DEPT_MAP = {
     "河野": ("NeeSa", "総務部"),
     "久保田": ("NeeSa", "SNS部"),
     "須賀": ("NeeSa", "SNS部"),
+    "河村": ("NeeSa", "SNS部"),
+    "三鹿": ("NeeSa", "WEBデザイン"),
+    "濵口": ("NeeSa", "WEBデザイン"),
     "佐藤": ("NeeSa", "商品管理"),
     "矢垰": ("NeeSa", "商品管理"),
     "松田": ("NeeSa", "商品管理"),
     "田中": ("NeeSa", "商品管理"),
     "山藤": ("アソビバスターズ", "アソビバスターズ発送"),
-    "宮崎": ("アソビバスターズ", "アソビバスターズ発送"),  # ※シフト源未連携(avivastars側)
+    "宮崎": ("アソビバスターズ", "アソビバスターズ発送"),  # トレコレKoTから取得
 }
 DEFAULT_GROUP = ("NeeSa", "AceCosme発送")
 AT121_GROUP = ("ディアメント", "@121")  # 「@121」マーカー付きシフトの行き先
-DEPT_ORDER = ["総務部", "SNS部", "商品管理", "AceCosme発送", "@121", "アソビバスターズ発送"]
+DEPT_ORDER = ["総務部", "SNS部", "WEBデザイン", "商品管理", "AceCosme発送",
+              "@121", "アソビバスターズ発送"]
 COMPANY_ORDER = ["NeeSa", "ディアメント", "アソビバスターズ"]
 REMOTE_NAMES = {"梅津"}  # リモート勤務者
+# ボードに出さない人（退職・別管理・表示不要など）
+EXCLUDE_NAMES = {"藤原", "佐々木", "有重", "伊藤", "曽我部"}
 
 # 同姓の曖昧さ回避: カレンダー名(lastName) → 採用するKoTフルネーム
 KOT_FULLNAME = {"大井": "大井夏美"}
@@ -198,6 +204,8 @@ def get_today_shifts(target_date=None):
             if not parsed:
                 continue
             if not _applies_on(c, target_date):
+                continue
+            if parsed["name"] in EXCLUDE_NAMES:
                 continue
             parsed["summary"] = c.get("summary", "")
             parsed["remote"] = parsed["name"] in REMOTE_NAMES

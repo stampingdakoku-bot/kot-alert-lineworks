@@ -125,7 +125,7 @@ def apply_today(groups, now):
     gmap = {(g["company"], g["dept"]): g for g in groups}
 
     def _add_punch_only(name, info, remote=False):
-        if name in scheduled:
+        if name in scheduled or name in neesa_lw.EXCLUDE_NAMES:
             return
         st = _status(info)
         if st == "scheduled":  # 打刻も確定も無いなら出さない

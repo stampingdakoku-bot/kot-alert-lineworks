@@ -56,6 +56,13 @@ DEPT_ORDER = ["総務部", "SNS部", "商品管理", "AceCosme発送", "@121", "
 COMPANY_ORDER = ["NeeSa", "ディアメント", "アソビバスターズ"]
 REMOTE_NAMES = {"梅津"}  # リモート勤務者
 
+# 同姓の曖昧さ回避: カレンダー名(lastName) → 採用するKoTフルネーム
+KOT_FULLNAME = {"大井": "大井夏美"}
+# 打刻が特殊な人: スケジュールがあれば打刻に関係なく出勤中(緑)にする
+SCHEDULE_GREEN_NAMES = {"山藤"}
+# NeeSa KoTではなくトレコレKoT(既存KOT_TOKEN)で打刻する人 → 当日打刻で表示
+CROSS_KOT_NAMES = {"宮崎"}
+
 _token_cache = {"access_token": None, "expires_at": 0}
 
 

@@ -41,8 +41,7 @@
     .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex: none; }
     .d-scheduled { background: #cbd5e1; }
     .d-working   { background: #34d399; }
-    .d-error     { background: #fb7185; }
-    .d-done      { background: #a7f3d0; }
+    .d-done      { background: #818cf8; }
 
     .company {
       font-size: clamp(18px, 2.8vw, 27px); font-weight: 800; color: #0f766e;
@@ -85,12 +84,11 @@
       line-height: 1.15; word-break: break-word;
     }
     .chip .time { font-size: clamp(13px, 1.5vw, 17px); color: #94a3b8; margin-top: 3px; }
-    .chip.working   { background: #ecfdf5; border-color: #6ee7b7; }
+    .chip.working   { background: #ecfdf5; border-color: #34d399; box-shadow: 0 0 0 1px #34d399 inset; }
     .chip.working .name { color: #059669; }
-    .chip.error     { background: #fff1f2; border-color: #fda4af; }
-    .chip.error .name { color: #e11d48; }
-    .chip.done      { background: #f0fdf4; border-color: #d1fae5; opacity: .7; }
-    .chip.done .name { color: #6b7280; }
+    .chip.done      { background: #eef2ff; border-color: #c7d2fe; }
+    .chip.done .name { color: #6366f1; }
+    .chip.done .time { color: #a5b4fc; }
     .chip.scheduled { background: #f8fafc; border-color: #e2e8f0; }
     .badge-remote {
       position: absolute; top: -8px; right: -6px;
@@ -143,7 +141,6 @@
   <div class="legend">
     <span><i class="dot d-working"></i>出勤中</span>
     <span><i class="dot d-scheduled"></i>予定（未出勤）</span>
-    <span><i class="dot d-error"></i>要確認</span>
     <span><i class="dot d-done"></i>退勤済</span>
     <span>🏠 リモート</span>
   </div>

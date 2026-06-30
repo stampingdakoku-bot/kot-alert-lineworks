@@ -47,6 +47,7 @@ DEPT_MAP = {
     "三鹿": ("NeeSa", "WEB部"),
     "濵口": ("NeeSa", "WEB部"),
     "藤井": ("NeeSa", "WEB部"),
+    "森岡": ("NeeSa", "WEB部"),  # トレコレKoTから取得
     "兼田": ("NeeSa", "総務部"),
     "松田": ("NeeSa", "総務部"),
     "佐藤": ("NeeSa", "商品管理部"),
@@ -94,7 +95,7 @@ KOT_EXTRA_FULLNAMES = {"大井蒼太": ("蒼太", ("NeeSa", "発送部"))}
 # （開始前=予定 / 時間内=出勤中 / 終了後=退勤済）
 SCHEDULE_BASED_NAMES = {"山藤", "三鹿"}
 # NeeSa KoTではなくトレコレKoT(既存KOT_TOKEN)で打刻する人 → 当日打刻で表示
-CROSS_KOT_NAMES = {"宮崎", "河村"}
+CROSS_KOT_NAMES = {"宮崎", "河村", "森岡"}
 # トレコレKoT側で同姓が複数いる人の確定: 名字 → 採用するフルネーム
 # （例: 河村は彩佳・遥華の2名がトレコレKoTに居るため彩佳に限定）
 CROSS_KOT_FULLNAME = {"河村": "河村彩佳"}

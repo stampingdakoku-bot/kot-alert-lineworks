@@ -89,7 +89,9 @@
                     <td style="font-size:14px">{{ staff.name }}</td>
                     <td style="font-size:13px;color:#666;white-space:nowrap">{{ staff.shift_time }}</td>
                     <td style="font-size:12px;white-space:nowrap">
-                        {% if is_in %}
+                        {% if card.kot_blocked %}
+                            <span style="color:#95a5a6">—</span>
+                        {% elif is_in %}
                             {% for c in card.staff_clocked_in %}
                                 {% if c.emp_key == staff.emp_key %}
                                     <span style="color:#27ae60">出勤 {{ c.clock_in }}</span>
@@ -100,8 +102,6 @@
                             {% endfor %}
                         {% elif is_not_clocked %}
                             <span style="color:#e74c3c">未打刻</span>
-                        {% elif card.kot_blocked %}
-                            <span style="color:#95a5a6">—</span>
                         {% elif staff.before_shift %}
                             <span style="color:#95a5a6">—</span>
                         {% else %}

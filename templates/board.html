@@ -137,9 +137,9 @@
     </div>
 
     <div class="legend">
-      <span><i class="dot c-working">●</i>出勤中</span>
-      <span><i class="dot c-scheduled">●</i>予定（未出勤）</span>
-      <span><i class="dot c-done">●</i>退勤済</span>
+      <span><b style="color:#27ae60">出勤中</b></span>
+      <span><b style="color:#3498db">退勤済</b></span>
+      <span><b style="color:#95a5a6">予定</b>（未出勤）</span>
       <span>🏠 リモート</span>
     </div>
 
@@ -173,26 +173,20 @@
             <table>
               <thead>
                 <tr>
-                  <th style="width:30px"></th>
                   <th>スタッフ</th>
                   <th>シフト</th>
-                  <th>打刻状況</th>
+                  <th>状況</th>
                 </tr>
               </thead>
               <tbody>
                 {% for s in d.shifts %}
                 <tr>
-                  <td class="st">
-                    {% if s.status == 'working' %}<span style="color:#27ae60" title="出勤中">●</span>
-                    {% elif s.status == 'done' %}<span style="color:#3498db" title="退勤済">●</span>
-                    {% else %}<span style="color:#cbd5e1" title="予定">●</span>{% endif %}
-                  </td>
                   <td class="nm">{{ s.name }}{% if s.remote %}<span class="home" title="リモート">🏠</span>{% endif %}{% if s.unmapped %}<span class="um">未分類</span>{% endif %}</td>
                   <td class="sh">{% if s.start %}{{ s.start }}–{{ s.end }}{% else %}—{% endif %}</td>
                   <td class="stt">
                     {% if s.status == 'working' %}<span style="color:#27ae60">出勤中</span>
                     {% elif s.status == 'done' %}<span style="color:#3498db">退勤済</span>
-                    {% else %}<span style="color:#95a5a6">—</span>{% endif %}
+                    {% else %}<span style="color:#95a5a6">予定</span>{% endif %}
                   </td>
                 </tr>
                 {% endfor %}

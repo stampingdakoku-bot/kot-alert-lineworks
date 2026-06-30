@@ -119,6 +119,9 @@ def _trecole_status(names, date_str):
         ln = e.get("lastName", "")
         if ln not in names:
             continue
+        pin = neesa_lw.CROSS_KOT_FULLNAME.get(ln)
+        if pin and (ln + e.get("firstName", "")) != pin:
+            continue  # 同姓の別人を除外（指定フルネームのみ）
         key = e.get("key", "")
         c = clock.get(key, {})
         info = {"clock_in": c.get("clock_in"), "clock_out": c.get("clock_out"),

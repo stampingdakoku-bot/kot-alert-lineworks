@@ -94,7 +94,10 @@ KOT_EXTRA_FULLNAMES = {"大井蒼太": ("蒼太", ("NeeSa", "発送部"))}
 # （開始前=予定 / 時間内=出勤中 / 終了後=退勤済）
 SCHEDULE_BASED_NAMES = {"山藤", "三鹿"}
 # NeeSa KoTではなくトレコレKoT(既存KOT_TOKEN)で打刻する人 → 当日打刻で表示
-CROSS_KOT_NAMES = {"宮崎"}
+CROSS_KOT_NAMES = {"宮崎", "河村"}
+# トレコレKoT側で同姓が複数いる人の確定: 名字 → 採用するフルネーム
+# （例: 河村は彩佳・遥華の2名がトレコレKoTに居るため彩佳に限定）
+CROSS_KOT_FULLNAME = {"河村": "河村彩佳"}
 
 _token_cache = {"access_token": None, "expires_at": 0}
 

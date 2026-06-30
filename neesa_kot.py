@@ -169,6 +169,8 @@ def apply_today(groups, now):
     def _add_punch_only(name, info, remote=False):
         if name in scheduled or name in neesa_lw.EXCLUDE_NAMES:
             return
+        if name in neesa_lw.SCHEDULE_BASED_NAMES:
+            return  # 打刻が特殊な人はシフト時間でのみ判定（打刻のみでは出さない）
         st = _status(info)
         if st == "scheduled":  # 打刻も確定も無いなら出さない
             return

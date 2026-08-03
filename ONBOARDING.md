@@ -1,46 +1,77 @@
-# KoT Alert / 勤怠ボード — 引き継ぎガイド
+# KoT Alert / 勤怠ボード — 引き継ぎ & セットアップ手順書（松田さん向け）
 
 King of Time（KoT）の打刻データをもとに、LINE WORKSへ出退勤アラートを自動送信し、
-さらに全社の勤怠状況をモニタ表示する「勤怠ボード」を提供するシステムです。
-このドキュメントは新しい担当者がスムーズに引き継ぐための手順書です。
-（システムの詳細仕様・変更履歴は同リポジトリの `CLAUDE.md` に集約されています。まずそちらも一読してください）
+全社の勤怠状況をモニタ表示する「勤怠ボード」を提供するシステムです。
+このドキュメント1本で、松田さんのPCでのセットアップから日々の運用まで完結します。
+（さらに詳しい仕様・全変更履歴は同リポジトリの `CLAUDE.md` に集約。Claude Codeなら自動で読み込まれます）
 
 ---
 
-## 1. まず動いているものを見る（URL）
+## 0. まず動いているものを見る（URL）
 
 - 勤怠ボード（NeeSa・モニタ表示用）: https://133-125-93-39.sslip.io/board
 - 管理画面ダッシュボード（トレコレ）: https://133-125-93-39.sslip.io/
   - `/staff` スタッフ管理 ・ `/shifts` シフト ・ `/logs` ログ ・ `/stores` 店舗設定 ・ `/settings` 設定
-- 参考: 駐車場位置スプレッドシート（Google, 閲覧権限が要る）
+- 駐車場位置スプレッドシート（Google, 閲覧権限が要る）:
   https://docs.google.com/spreadsheets/d/10L9zCxOSFLLT-ASPkyJQzEnaeVb-ePACDPL47WiESIk/edit?gid=2014155853#gid=2014155853
 
-HTTP(`http://133.125.93.39`)でアクセスしても自動でHTTPSへリダイレクトされます。
+`http://133.125.93.39` にアクセスしても自動でHTTPSへリダイレクトされます。
 
 ---
 
-## 2. 引き継ぎチェックリスト（前任者にやってもらう＝アクセス付与）
+## 1. 引き継ぎで受け取るアクセス（前任者が付与）
 
-新担当者が作業するには次のアクセスが必要です。**★は前任者しか付与できないもの**。
+| # | アクセス | 内容 | 状態 |
+|---|---|---|---|
+| ① | GitHub | `stampingdakoku-bot/kot-alert-lineworks` にコラボレーター招待（Write） | 招待送信済み → **メールのAcceptを押す** |
+| ② | 本番VPS SSH | `ubuntu@133.125.93.39` に公開鍵を登録 | 下の手順2で自分の鍵を作り公開鍵を渡す |
+| ③ | Supabase | プロジェクト `aujxtiyvdywabtnkvswm` へ招待 | 招待メールをAccept |
+| ④ | 管理Googleアカウント | `Stamping.dakoku@gmail.com`（KoT等のログイン起点） | パスワードを安全に受領 |
 
-- [ ] ★ **GitHub**: `stampingdakoku-bot/kot-alert-lineworks`（Private）に Collaborator 追加
-- [ ] ★ **本番VPSのSSH**: `ubuntu@133.125.93.39`（さくらVPS）に新担当者の公開鍵を登録
-      （`~ubuntu/.ssh/authorized_keys` に追記、または前任者が鍵を共有）
-- [ ] ★ **Supabase**: プロジェクト `aujxtiyvdywabtnkvswm`（東京リージョン）への招待
-- [ ] ★ **管理用Googleアカウント**: `Stamping.dakoku@gmail.com`（KoT/各種ログイン起点）
-- [ ] **KoT WebAPI**: 新しい作業環境から叩く場合、許可IPに注意（本番は 133.125.93.39 を登録済み。
-      ローカルから直接叩くのは基本しない。VPS上で実行する）
-- [ ] **LINE WORKS**: 2テナント（avivastars=トレコレ/アソビバ、works-42585=NeeSa）の管理者権限が要る場合のみ
-
-> 認証情報（トークン・秘密鍵）は **リポジトリには入っていません**。すべて本番VPSの
+> **認証情報（トークン・秘密鍵）はGitHubには入っていません。** すべて本番VPSの
 > `/home/ubuntu/kot-alert-lineworks/.env` と `*.pem` にあります（gitignore済み）。
-> SSHアクセスさえ得れば、そこから参照できます。**チャットやメールに秘密情報を貼らないこと。**
+> SSHが通れば本人がVPS内で参照できます。**秘密情報はチャット/メールに貼らないこと。**
+
+---
+
+## 2. 松田さんのPCでの初期セットアップ
+
+### 2-1. VPSアクセス用のSSH鍵を作る（1回だけ）
+ターミナル（Mac/Linux）または PowerShell / Git Bash（Windows）で：
+```bash
+ssh-keygen -t ed25519 -C "ai_matsuda@neesa-vps"
+```
+保存先・パスフレーズはEnterで既定のままでOK。続いて**公開鍵の中身**を表示：
+```bash
+# Mac/Linux / Git Bash
+cat ~/.ssh/id_ed25519.pub
+# Windows PowerShell
+type $env:USERPROFILE\.ssh\id_ed25519.pub
+```
+表示された `ssh-ed25519 AAAA... ai_matsuda@neesa-vps` の**1行を前任者へ送る**。
+→ 前任者がVPSの `authorized_keys` に登録したら、以下でSSH接続を確認：
+```bash
+ssh ubuntu@133.125.93.39
+```
+
+### 2-2. リポジトリを clone（GitHubの①招待をAcceptした後）
+自分のGitHubアカウントにSSH鍵を登録済みなら：
+```bash
+git clone git@github.com:stampingdakoku-bot/kot-alert-lineworks.git
+cd kot-alert-lineworks
+```
+（HTTPSでcloneする場合は `https://github.com/stampingdakoku-bot/kot-alert-lineworks.git`）
+
+### 2-3. ローカルで動かすことについて（注意）
+- KoT WebAPIは**許可IPが本番VPS(133.125.93.39)限定**、秘密情報もVPSにあるため、
+  **ローカルPCでフル動作させるのは基本できません**。
+- 運用は「**ローカル/VPSで編集 → git → 本番VPSで反映**」が基本。VPS上で直接編集・実行も可。
 
 ---
 
 ## 3. 本番環境の全体像
 
-- さくらVPS `ubuntu@133.125.93.39`（Ubuntu 22.04, 1Core-1GB）
+- さくらVPS `ubuntu@133.125.93.39`（Ubuntu 22.04, 1Core-1GB, 月1,980円）
 - 構成: **Nginx(:80/:443) → Gunicorn(127.0.0.1:5000) → Flask(app.py)**
 - HTTPS: 無料サブドメイン `133-125-93-39.sslip.io`（sslip.io, 登録不要）＋ Let's Encrypt（certbot自動更新）
 - 定期実行: `checker.py` を cron で10分ごと（アラート送信本体）
@@ -56,19 +87,21 @@ tail -f /home/ubuntu/kot-alert-lineworks/logs/cron.log   # checker.pyログ
 
 ---
 
-## 4. 開発〜デプロイの流れ
+## 4. 開発〜デプロイの流れ（標準）
 
-**推奨（新担当者が自分のGitHub SSH鍵を持っている場合）＝ふつうのGit運用**
-1. `git clone git@github.com:stampingdakoku-bot/kot-alert-lineworks.git`
-2. 編集 → `git add <file>` → `git commit` → `git push origin main`
-3. 本番反映: VPSで `cd /home/ubuntu/kot-alert-lineworks && git pull && sudo systemctl restart kot-alert`
+1. 編集 → `git add <file>` → `git commit -m "..."` → `git push origin main`
+2. 本番反映:
+   ```bash
+   ssh ubuntu@133.125.93.39
+   cd /home/ubuntu/kot-alert-lineworks
+   git pull
+   sudo systemctl restart kot-alert     # app.py/テンプレ変更時
+   ```
+   （`checker.py` はcron実行なのでpullだけで次回反映。Web/画面変更はrestartが必要）
 
-**注意（この前任者PC特有の事情）**
-- 前任者のWindows機には **GitHubのSSH鍵が無く**、push/pullを直接できませんでした。
-  そのため「ローカルでcommit → `git bundle` でVPSへ転送 → VPSでpush」という回避策を使っていました
-  （詳細は `CLAUDE.md` / メモ参照）。新担当者が自分の鍵でcloneできるなら、この回避策は不要です。
-- **ローカルの古いクローンをそのままscpで上書きしない**こと（本番を巻き戻す事故が過去に発生）。
-  必ずGit経由で同期する。
+**注意（事故防止）**
+- ローカルの古いクローンをそのまま `scp` で本番へ上書きしない（本番を巻き戻す事故が過去に発生）。必ずGit経由で同期する。
+- 前任者のPCはGitHub鍵が無く「git bundle でVPS経由push」という回避策を使っていた。松田さんが自分の鍵でcloneできるなら**この回避策は不要**、普通に push/pull してよい。
 
 ---
 
@@ -81,22 +114,23 @@ tail -f /home/ubuntu/kot-alert-lineworks/logs/cron.log   # checker.pyログ
 | `db_supabase.py` | Supabase操作 + テンプレJSON管理 |
 | `kot_api.py` | トレコレKoT WebAPIクライアント（`KOT_TOKEN`） |
 | `neesa_kot.py` | NeeSa KoTクライアント（`NEESA_KOT_TOKEN`）＝勤怠ボードの色付け |
-| `neesa_lw.py` | NeeSa LINE WORKSカレンダー読取＋ボードのマッピング設定 |
+| `neesa_lw.py` | NeeSa LINE WORKSカレンダー読取＋**ボードのマッピング設定** |
 | `lw_api.py` | トレコレ側 LINE WORKS Botクライアント |
 | `templates/board.html` | 勤怠ボード（NeeSa, キオスク） |
 | `templates/base.html` `dashboard.html` 他 | 管理画面テンプレート |
 | `alert_templates.json` | アラート文言テンプレート（管理画面から編集可） |
 | `.env` / `*.pem` | 秘密情報（**git管理外・VPSのみ**） |
 
-**勤怠ボードのマッピングを直したい時**は基本 `neesa_lw.py` の以下を編集:
+**勤怠ボードのマッピングを直したい時**は `neesa_lw.py` の以下を編集:
 `DEPT_MAP`（名前→会社/部署）, `EXCLUDE_NAMES`, `REMOTE_NAMES`, `SCHEDULE_BASED_NAMES`,
-`CROSS_KOT_NAMES`（トレコレKoT側で打刻する人）, `KOT_NAME_ALIAS`（旧姓等の別名）, `DEPT_ORDER` など。
+`CROSS_KOT_NAMES`（トレコレKoT側で打刻する人）, `CROSS_KOT_FULLNAME`（同姓の確定）,
+`KOT_NAME_ALIAS`（旧姓等の別名）, `DEPT_ORDER` など。
 
 ---
 
 ## 6. ハマりどころ（重要）
 
-- **KoT API 禁止時間帯（JST 08:30–10:00, 17:30–18:30）**: この間はAPIが403。打刻が取れないので
+- **KoT API 禁止時間帯（JST 08:30–10:00, 17:30–18:30）**: この間はAPIが403。打刻が取れず、
   ボードは全員グレー（予定）、ダッシュボードは「—」表示になる（仕様）。時間帯を過ぎれば復旧。
 - **KoTが2アカウント**: トレコレ(`KOT_TOKEN`・33名5店舗)と NeeSa(`NEESA_KOT_TOKEN`・別会社)は別物。
 - **同姓・旧姓**: 河村(彩佳/遥華)など同姓が居るため `CROSS_KOT_FULLNAME` でフルネーム固定。
@@ -107,11 +141,45 @@ tail -f /home/ubuntu/kot-alert-lineworks/logs/cron.log   # checker.pyログ
 
 ---
 
-## 7. 引き継ぎ完了の確認
+## 7. アカウント / 外部サービス一覧
 
-- [ ] 新担当者が自分の鍵でGitHubからcloneできる
-- [ ] 新担当者がVPSにSSHでき、`sudo systemctl status kot-alert` が見える
-- [ ] 新担当者が試しに軽微な変更をcommit→push→VPSでpull→restart→反映を1往復できた
-- [ ] Supabase / 管理Googleアカウントにアクセスできる
+- GitHub: `stampingdakoku-bot/kot-alert-lineworks`（= `Stamping.dakoku@gmail.com` に紐づくアカウント）
+- 本番VPS: さくらVPS `ubuntu@133.125.93.39`
+- Supabase: プロジェクト `aujxtiyvdywabtnkvswm`（東京リージョン）
+- 管理Google: `Stamping.dakoku@gmail.com`（KoT/各種ログイン起点）
+- KoT WebAPI: `https://api.kingtime.jp/v1.0`（許可IPに 133.125.93.39 登録済み）
+- LINE WORKS: 2テナント（avivastars=トレコレ/アソビバ, works-42585=NeeSa）
+
+---
+
+## 8. Claude Code キックオフプロンプト（そのまま貼る）
+
+clone後、リポジトリ内で Claude Code を起動し、最初にこれを貼ってください：
+
+```
+このリポジトリ(kot-alert-lineworks)の保守を引き継ぎました。
+まず CLAUDE.md と ONBOARDING.md を読んで全体像を把握してください。
+これは King of Time の打刻をもとに LINE WORKS へ勤怠アラートを送り、
+勤怠ボード(https://133-125-93-39.sslip.io/board)をモニタ表示するシステムで、
+本番は さくらVPS ubuntu@133.125.93.39（systemd: kot-alert / Nginx→Gunicorn→Flask）です。
+
+作業ルール:
+- 本番反映は「編集→git push→VPSで git pull→sudo systemctl restart kot-alert」。
+- 秘密情報(.env, *.pem)はVPSのみ。チャットに貼らない・GitHubに入れない。
+- KoT APIは禁止時間帯(JST 8:30-10:00, 17:30-18:30)がある。
+- ローカルの古いコードをscpで本番へ上書きしない(必ずGit経由)。
+
+まず、本番の稼働状況(systemctl status kot-alert)と、local/VPS/originのgit同期状況を確認して、
+現状を要約してください。
+```
+
+---
+
+## 9. 引き継ぎ完了チェック
+
+- [ ] ①GitHub招待をAccept、自分の鍵でcloneできた
+- [ ] ②VPSにSSH接続でき、`sudo systemctl status kot-alert` が見える
+- [ ] ③Supabase / ④管理Googleにアクセスできる
+- [ ] 軽微な変更を commit→push→VPSでpull→restart→反映、を1往復できた
 
 これらが通れば引き継ぎ完了です。困ったらまず `CLAUDE.md`（詳細仕様・全変更履歴）を参照してください。

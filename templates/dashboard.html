@@ -16,7 +16,8 @@
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <h2 style="margin:0">ダッシュボード — {{ today[5:].replace('-', '/') }}</h2>
+        <h2 style="margin:0">本日の出勤状況</h2>
+        <span id="liveClock" style="font-size:14px;color:#666;font-variant-numeric:tabular-nums"></span>
         {% if is_past %}
         <span style="background:#f39c12;color:white;font-size:11px;padding:3px 8px;border-radius:10px">過去データ表示中</span>
         {% endif %}
@@ -33,10 +34,31 @@
     </div>
 </div>
 
+{# ===== 表示カスタマイズ(ブラウザ単位で記憶・localStorage) ===== #}
+<div class="card" style="padding:12px 16px;margin-bottom:16px">
+    <div id="customizeToggle" style="cursor:pointer;font-size:14px;font-weight:bold;color:#2c3e50;display:flex;align-items:center;gap:6px">
+        <span id="customizeArrow">▶</span> 表示する項目をカスタマイズ
+    </div>
+    <div id="customizePanel" style="display:none;margin-top:12px;flex-wrap:wrap;gap:6px 16px" >
+        {% for card in store_cards %}
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-right:12px">
+            <input type="checkbox" class="dashCheck" data-group="{{ card.store_name }}" checked style="min-height:auto;width:16px;height:16px">
+            {{ card.store_name }}
+        </label>
+        {% endfor %}
+        {% for g in neesa_groups %}
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-right:12px">
+            <input type="checkbox" class="dashCheck" data-group="{{ g.company }}|{{ g.dept }}" checked style="min-height:auto;width:16px;height:16px">
+            {{ g.company }} / {{ g.dept }}
+        </label>
+        {% endfor %}
+    </div>
+</div>
+
 {# ===== 店舗カード グリッド ===== #}
 <div class="store-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     {% for card in store_cards %}
-    <div class="card" style="padding:20px">
+    <div class="card" data-group="{{ card.store_name }}" style="padding:20px">
         {% set n_scheduled = card.staff_scheduled|length %}
         {% set n_clocked = card.staff_clocked_in|length %}
         {% if n_clocked == n_scheduled and n_scheduled > 0 %}
@@ -132,7 +154,7 @@
 {% if neesa_groups %}
 <div class="store-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     {% for g in neesa_groups %}
-    <div class="card" style="padding:20px">
+    <div class="card" data-group="{{ g.company }}|{{ g.dept }}" style="padding:20px">
         <h2 style="margin:0 0 12px;font-size:18px">{{ g.company }} / {{ g.dept }}</h2>
         {% if g.shifts %}
         <div class="table-wrap">
@@ -241,54 +263,7 @@
     </div>
 </div>
 
-{# ===== 注意が必要なスタッフ ===== #}
-{% if problem_late or problem_overtime %}
-<div class="card">
-    <h2 style="color:#e74c3c">注意が必要なスタッフ</h2>
-    <div class="problem-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
 
-        {% if problem_late %}
-        <div>
-            <h3 style="font-size:14px;margin-bottom:8px;color:#e67e22">出勤打刻なし</h3>
-            <div class="table-wrap">
-            <table>
-                <thead><tr><th>社員コード</th><th>氏名</th><th>通知回数</th></tr></thead>
-                <tbody>
-                    {% for p in problem_late %}
-                    <tr>
-                        <td>{{ p.code }}</td>
-                        <td>{{ p.name }}</td>
-                        <td><span style="color:#e74c3c;font-weight:bold">{{ p.count }}回</span></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-        </div>
-        {% endif %}
-
-        {% if problem_overtime %}
-        <div>
-            <h3 style="font-size:14px;margin-bottom:8px;color:#e74c3c">超過警告</h3>
-            <div class="table-wrap">
-            <table>
-                <thead><tr><th>社員コード</th><th>氏名</th><th>通知回数</th></tr></thead>
-                <tbody>
-                    {% for p in problem_overtime %}
-                    <tr>
-                        <td>{{ p.code }}</td>
-                        <td>{{ p.name }}</td>
-                        <td><span style="color:#e74c3c;font-weight:bold">{{ p.count }}回</span></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
 
 <style>
 @media (max-width: 768px) {
@@ -311,6 +286,18 @@
         });
     }
 
+    // 本日の出勤状況見出し横のリアルタイム時計(1秒ごと)
+    function updateLiveClock() {
+        var el = document.getElementById('liveClock');
+        if (!el) return;
+        var n = new Date();
+        var pad = function(x) { return String(x).padStart(2, '0'); };
+        el.textContent = n.getFullYear() + '/' + (n.getMonth() + 1) + '/' + n.getDate() + ' ' +
+            pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':' + pad(n.getSeconds());
+    }
+    updateLiveClock();
+    setInterval(updateLiveClock, 1000);
+
     // 最終更新時刻表示
     var now = new Date();
     var hh = String(now.getHours()).padStart(2, '0');
@@ -323,6 +310,44 @@
     var isToday = {{ 'true' if is_today else 'false' }};
     if (isToday) {
         setTimeout(function() { location.reload(); }, 60000);
+    }
+
+    // 表示カスタマイズ(ブラウザ単位・localStorageで記憶)
+    var STORAGE_KEY = 'dashboardHiddenGroups';
+    var hidden = [];
+    try { hidden = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch (e) { hidden = []; }
+
+    function applyVisibility() {
+        document.querySelectorAll('.dashCheck').forEach(function(cb) {
+            var visible = hidden.indexOf(cb.dataset.group) === -1;
+            cb.checked = visible;
+            var card = document.querySelector('[data-group="' + CSS.escape(cb.dataset.group) + '"]:not(.dashCheck)');
+            if (card) card.style.display = visible ? '' : 'none';
+        });
+    }
+    document.querySelectorAll('.dashCheck').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var group = this.dataset.group;
+            if (this.checked) {
+                hidden = hidden.filter(function(g) { return g !== group; });
+            } else if (hidden.indexOf(group) === -1) {
+                hidden.push(group);
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(hidden));
+            applyVisibility();
+        });
+    });
+    applyVisibility();
+
+    var toggle = document.getElementById('customizeToggle');
+    var panel = document.getElementById('customizePanel');
+    var arrow = document.getElementById('customizeArrow');
+    if (toggle) {
+        toggle.addEventListener('click', function() {
+            var open = panel.style.display !== 'none' && panel.style.display !== '';
+            panel.style.display = open ? 'none' : 'flex';
+            arrow.textContent = open ? '▶' : '▼';
+        });
     }
 })();
 </script>

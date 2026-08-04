@@ -1,6 +1,17 @@
 {% extends 'base.html' %}
 {% block title %}スケジュール登録{% endblock %}
 {% block content %}
+<style>
+body { background: {{ staff.bg_color or '#f5f5f5' }} !important; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.cal-cell { aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+            border-radius:6px; text-decoration:none; color:#333; font-size:13px; position:relative; }
+.cal-cell:hover { background:#f0f0f0; }
+.cal-cell.today { color:#3498db; font-weight:bold; }
+.cal-cell.selected { background:#3498db; color:white; font-weight:bold; }
+.cal-dot { width:5px; height:5px; border-radius:50%; background:#27ae60; margin-top:2px; }
+.cal-cell.selected .cal-dot { background:white; }
+</style>
 <div class="card">
     <h2>予定を登録（{{ staff.display_name }} さん）</h2>
     <form method="POST">
@@ -29,33 +40,44 @@
 </div>
 
 <div class="card">
-    <h2>今後14日間の予定</h2>
-    <div style="display:flex;flex-direction:column;gap:2px">
-    {% for day in days %}
-    {% if day.events or day.is_today %}
-    <div style="display:flex;border-top:1px solid #eee;padding:10px 0;gap:12px">
-        <div style="width:76px;flex-shrink:0;font-size:13px;{{ 'color:#3498db;font-weight:bold' if day.is_today else 'color:#666' }}">
-            {{ day.label }}
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
-            {% if day.events %}
-            {% for e in day.events %}
-            <div style="background:#eaf4fc;border-left:4px solid #3498db;border-radius:4px;padding:6px 10px">
-                <div style="font-size:13px;font-weight:600;color:#2c3e50">{{ e.summary }}</div>
-                {% if not e.all_day %}
-                <div style="font-size:12px;color:#666">
-                    {{ e.start[11:16] }}{% if e.end %} - {{ e.end[11:16] }}{% endif %}
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-            {% else %}
-            <div style="font-size:13px;color:#ccc">予定なし</div>
-            {% endif %}
-        </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <a href="?month={{ prev_month }}" class="btn" style="background:#ecf0f1;color:#333;padding:6px 12px">◀</a>
+        <h2 style="margin:0">{{ month_label }}</h2>
+        <a href="?month={{ next_month }}" class="btn" style="background:#ecf0f1;color:#333;padding:6px 12px">▶</a>
     </div>
-    {% endif %}
+    <div class="cal-grid" style="margin-bottom:4px">
+        {% for w in weekday_ja %}
+        <div style="text-align:center;font-size:12px;color:#999;font-weight:bold">{{ w }}</div>
+        {% endfor %}
+    </div>
+    {% for week in weeks %}
+    <div class="cal-grid" style="margin-bottom:2px">
+        {% for d in week %}
+        {% if d %}
+        {% set d_iso = d.isoformat() %}
+        <a href="?month={{ current_month }}&date={{ d_iso }}"
+           class="cal-cell{% if d_iso == today %} today{% endif %}{% if d_iso == selected_date %} selected{% endif %}">
+            {{ d.day }}
+            {% if names_by_date.get(d_iso) %}<span class="cal-dot"></span>{% endif %}
+        </a>
+        {% else %}
+        <div></div>
+        {% endif %}
+        {% endfor %}
+    </div>
     {% endfor %}
+
+    <div style="margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <h2 style="font-size:15px">{{ selected_date }} の出勤予定</h2>
+        {% if selected_names %}
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+            {% for name in selected_names %}
+            <span style="background:#eaf4fc;color:#2c3e50;padding:4px 12px;border-radius:12px;font-size:13px">{{ name }}</span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:#999;font-size:13px;margin-top:8px">この日の出勤予定はありません</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

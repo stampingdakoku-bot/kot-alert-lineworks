@@ -2,6 +2,23 @@
 {% block title %}アラート設定{% endblock %}
 {% block content %}
 
+<h2 style="margin-bottom:16px">設定</h2>
+
+<div class="stats" style="margin-bottom:24px">
+    <a href="/staff" class="stat" style="text-decoration:none;color:inherit">
+        <div class="num">👤</div>
+        <div class="label">スタッフ管理</div>
+    </a>
+    <a href="/stores" class="stat" style="text-decoration:none;color:inherit">
+        <div class="num">🏬</div>
+        <div class="label">店舗設定</div>
+    </a>
+    <a href="/logs" class="stat" style="text-decoration:none;color:inherit">
+        <div class="num">📋</div>
+        <div class="label">アラートログ</div>
+    </a>
+</div>
+
 <h2 style="margin-bottom:16px">アラート設定</h2>
 
 <form method="POST" action="/settings">

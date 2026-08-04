@@ -69,13 +69,10 @@
         <a href="/" class="brand">Work Log</a>
         <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="メニュー">&#9776;</button>
         <div class="nav-links">
-            <a href="/" {% if request.path == '/' %}class="active"{% endif %}>ダッシュボード</a>
-            <a href="/shifts" {% if '/shifts' in request.path %}class="active"{% endif %}>シフト一覧</a>
-            <a href="/staff" {% if '/staff' in request.path %}class="active"{% endif %}>スタッフ</a>
-            <a href="/logs" {% if '/logs' in request.path %}class="active"{% endif %}>ログ</a>
-            <a href="/stores" {% if '/stores' in request.path %}class="active"{% endif %}>店舗設定</a>
-            <a href="/settings" {% if '/settings' in request.path %}class="active"{% endif %}>設定</a>
-            <a href="/my" {% if '/my' in request.path %}class="active"{% endif %}>個人メニュー</a>
+            <a href="/" {% if request.path == '/' %}class="active"{% endif %}>今日の出勤一覧</a>
+            <a href="/shifts" {% if '/shifts' in request.path %}class="active"{% endif %}>シフト</a>
+            <a href="/my" {% if '/my' in request.path %}class="active"{% endif %}>マイメニュー</a>
+            <a href="/settings" {% if request.path in ('/settings', '/staff', '/logs', '/stores') or request.path.startswith('/staff') %}class="active"{% endif %}>設定</a>
         </div>
     </nav>
     <div class="container">

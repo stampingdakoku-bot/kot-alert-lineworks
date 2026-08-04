@@ -2,6 +2,7 @@
 {% block title %}出勤状況一覧{% endblock %}
 {% block content %}
 <style>
+body { background: {{ staff.bg_color or '#f5f5f5' }} !important; }
 @keyframes blink-green { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 .person-card { position:relative; border:1px solid #ddd; border-radius:8px; padding:12px 12px 12px 28px;
                min-width:160px; background:white; }

@@ -9,7 +9,8 @@ SSOが解決次第、login()の中身だけをAuthlib実装に差し替える想
 既存の管理画面(/, /board, /staff等)はこれまで通り無認証のまま・無変更。
 """
 import functools
-from datetime import datetime, timezone, timedelta
+import calendar as _calendar_mod
+from datetime import datetime, date, timezone, timedelta
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from supabase import create_client
@@ -19,6 +20,7 @@ from dotenv import load_dotenv
 import kot_write
 import attendance_unified
 import lw_calendar_write
+import neesa_lw
 
 load_dotenv()
 JST = timezone(timedelta(hours=9))
@@ -141,7 +143,7 @@ def overview():
         return redirect(url_for('my.overview'))
 
     hidden_set = set(prefs.get('hidden_names') or [])
-    return render_template('my_overview.html', grouped=grouped, group_list=group_list, hidden_set=hidden_set)
+    return render_template('my_overview.html', staff=staff, grouped=grouped, group_list=group_list, hidden_set=hidden_set)
 
 
 @my_bp.route('/schedule', methods=['GET', 'POST'])
@@ -170,22 +172,55 @@ def schedule():
             flash('予定の登録に失敗しました', 'error')
         return redirect(url_for('my.schedule'))
 
-    upcoming = lw_calendar_write.list_upcoming_events()
-    weekday_ja = ['月', '火', '水', '木', '金', '土', '日']
-    by_date = {}
-    for e in upcoming:
-        d = e['start'][:10]
-        by_date.setdefault(d, []).append(e)
-    today_str = datetime.now(JST).strftime('%Y-%m-%d')
-    days = []
-    for i in range(14):
-        d = (datetime.now(JST) + timedelta(days=i)).strftime('%Y-%m-%d')
-        d_obj = datetime.strptime(d, '%Y-%m-%d')
-        days.append({
-            'date': d,
-            'label': f"{d_obj.month}/{d_obj.day}（{weekday_ja[d_obj.weekday()]}）",
-            'is_today': d == today_str,
-            'events': by_date.get(d, []),
-        })
+    now = datetime.now(JST)
+    today_str = now.strftime('%Y-%m-%d')
+    month_str = request.args.get('month')
+    if month_str:
+        try:
+            year, month = (int(x) for x in month_str.split('-'))
+        except ValueError:
+            year, month = now.year, now.month
+    else:
+        year, month = now.year, now.month
 
-    return render_template('my_schedule.html', staff=staff, today=today_str, days=days)
+    first_day = date(year, month, 1)
+    last_day = date(year, month, _calendar_mod.monthrange(year, month)[1])
+    names_by_date = neesa_lw.get_names_by_date_range(first_day, last_day)
+
+    weekday_ja_sun = ['日', '月', '火', '水', '木', '金', '土']
+    start_offset = (first_day.weekday() + 1) % 7  # 月曜=0 → 日曜=0起点に変換
+    weeks = []
+    week = [None] * start_offset
+    d = first_day
+    while d <= last_day:
+        week.append(d)
+        if len(week) == 7:
+            weeks.append(week)
+            week = []
+        d += timedelta(days=1)
+    if week:
+        weeks.append(week + [None] * (7 - len(week)))
+
+    selected_date = request.args.get('date') or today_str
+    selected_names = names_by_date.get(selected_date, [])
+
+    prev_month = (first_day - timedelta(days=1)).strftime('%Y-%m')
+    next_month = (last_day + timedelta(days=1)).strftime('%Y-%m')
+
+    return render_template(
+        'my_schedule.html', staff=staff, today=today_str,
+        weekday_ja=weekday_ja_sun, weeks=weeks, names_by_date=names_by_date,
+        month_label=f'{year}年{month}月', current_month=f'{year:04d}-{month:02d}',
+        prev_month=prev_month, next_month=next_month,
+        selected_date=selected_date, selected_names=selected_names,
+    )
+
+
+@my_bp.route('/color', methods=['POST'])
+@require_staff_login
+def set_color():
+    color = (request.form.get('bg_color') or '').strip()
+    if color:
+        supabase.table('staff_directory').update({'bg_color': color}) \
+            .eq('staff_id', session['staff_id']).execute()
+    return redirect(url_for('my.home'))

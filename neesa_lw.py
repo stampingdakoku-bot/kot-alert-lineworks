@@ -328,6 +328,41 @@ def _applies_on_at121(comp, target_date):
     return d0 <= target_date < d1
 
 
+def get_names_by_date_range(start_date, end_date):
+    """start_date〜end_date(両端含む、date型)の日ごとの出勤者名一覧を返す。
+    {date_iso: [name, ...]}。カレンダー取得はSHIFT_CALENDARS分+@121の計数回のみ
+    (日数分ではない)。/my/scheduleの月カレンダー表示で使用。"""
+    base = datetime(start_date.year, start_date.month, start_date.day, tzinfo=JST)
+    frm = base.isoformat()
+    end_base = datetime(end_date.year, end_date.month, end_date.day, tzinfo=JST)
+    unt = (end_base + timedelta(days=1)).isoformat()
+
+    normal_comps = []
+    for cal in SHIFT_CALENDARS:
+        normal_comps.extend(get_calendar_events(cal["calendar_id"], frm, unt))
+    at121_comps = get_calendar_events(AT121_CALENDAR_ID, frm, unt)
+
+    result = {}
+    d = start_date
+    while d <= end_date:
+        names = set()
+        for c in normal_comps:
+            parsed = parse_shift(c.get("summary", ""))
+            if not parsed or parsed["name"] in EXCLUDE_NAMES:
+                continue
+            if _applies_on(c, d):
+                names.add(parsed["name"])
+        for c in at121_comps:
+            p = parse_at121(c)
+            if not p or p["name"] in EXCLUDE_NAMES:
+                continue
+            if _applies_on_at121(c, d):
+                names.add(p["name"])
+        result[d.isoformat()] = sorted(names)
+        d += timedelta(days=1)
+    return result
+
+
 def get_today_shifts(target_date=None):
     """全シフトカレンダーから当日のシフトを取得し、名前→部署マッピングで
     会社/部署ごとにまとめる。繰り返しはRRULE展開で当日分のみ・名前で重複排除。

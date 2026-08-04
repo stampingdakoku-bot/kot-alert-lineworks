@@ -44,7 +44,8 @@ def _get_write_token():
     return resp.json()["access_token"]
 
 
-def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None, recurrence=None):
+def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None, recurrence=None,
+                  attendees=None, reminders=None):
     """予定を作成する。recurrence指定時は繰り返し予定として登録。戻り値: (success: bool, detail)"""
     calendar_id = calendar_id or DEFAULT_CALENDAR_ID
     user_id = user_id or neesa_lw.DEFAULT_USER
@@ -62,6 +63,10 @@ def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None, recu
     }
     if recurrence:
         comp["recurrence"] = recurrence
+    if attendees:
+        comp["attendees"] = attendees
+    if reminders:
+        comp["reminders"] = reminders
     body = {"eventComponents": [comp], "sendNotification": False}
     try:
         resp = requests.post(
@@ -83,7 +88,8 @@ def _events_url(event_id, calendar_id, user_id):
     return f"{neesa_lw.API_BASE}/users/{user_id}/calendars/{calendar_id}/events/{event_id}"
 
 
-def update_event(event_id, summary, start_dt, end_dt, recurrence=None, calendar_id=None, user_id=None):
+def update_event(event_id, summary, start_dt, end_dt, recurrence=None, calendar_id=None, user_id=None,
+                  attendees=None, reminders=None):
     """予定を更新する(全体入れ替え)。戻り値: (success: bool, detail)"""
     try:
         token = _get_write_token()
@@ -99,6 +105,10 @@ def update_event(event_id, summary, start_dt, end_dt, recurrence=None, calendar_
     }
     if recurrence:
         comp["recurrence"] = recurrence
+    if attendees:
+        comp["attendees"] = attendees
+    if reminders:
+        comp["reminders"] = reminders
     body = {"eventComponents": [comp], "sendNotification": False}
     try:
         resp = requests.put(
@@ -245,6 +255,8 @@ def get_my_events(display_name, start_date, end_date, calendar_id=None, user_id=
             except (ValueError, TypeError):
                 continue
             recurrence = comp.get("recurrence") or []
+            attendees = comp.get("attendees") or []
+            reminders = comp.get("reminders") or []
             d = start_date
             while d <= end_date:
                 if _occurs_on(comp, d):
@@ -255,6 +267,8 @@ def get_my_events(display_name, start_date, end_date, calendar_id=None, user_id=
                         'end_time': f'{dtend.hour:02d}:{dtend.minute:02d}',
                         'is_recurring': bool(recurrence),
                         'recurrence': recurrence,
+                        'attendees': attendees,
+                        'reminders': reminders,
                         'occurrence_date': d.isoformat(),
                         'series_start': dtstart.isoformat(),
                         'series_end': dtend.isoformat(),

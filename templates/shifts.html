@@ -2,71 +2,38 @@
 {% block title %}全社スタッフスケジュール一覧{% endblock %}
 {% block content %}
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-    <h2 style="margin:0">全社スタッフスケジュール一覧 — {{ today[5:].replace('-', '/') }} から7日間</h2>
-    <div style="position:relative">
-        <button id="tabFilterToggle" type="button" class="btn" style="padding:8px 16px;font-size:13px">表示するタブ ▾</button>
-        <div id="tabFilterPanel" class="card" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:240px;padding:12px;max-height:340px;overflow-y:auto">
-            <div style="font-size:12px;font-weight:bold;color:var(--nm-text-dim);margin-bottom:4px">アソビバスターズ（店舗）</div>
-            {% for store in store_shifts %}
-            <label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;cursor:pointer">
-                <input type="checkbox" class="tabCheck" data-tabkey="store:{{ store.store_name }}" style="min-height:auto;width:16px;height:16px">
-                {{ store.store_name }}
-            </label>
-            {% endfor %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="margin:0">全社スタッフスケジュール一覧</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <select id="deptSelect" style="min-width:200px">
+            <optgroup label="アソビバスターズ">
+                {% for store in store_shifts %}
+                <option value="store:{{ store.store_name }}" {{ 'selected' if store.store_name == active_store }}>{{ store.store_name }}</option>
+                {% endfor %}
+            </optgroup>
             {% for cg in neesa_companies %}
-            <div style="font-size:12px;font-weight:bold;color:var(--nm-text-dim);margin:10px 0 4px">{{ cg.company }}</div>
-            {% for group in cg.groups %}
-            <label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;cursor:pointer">
-                <input type="checkbox" class="tabCheck" data-tabkey="neesa:{{ group.tab_key }}" style="min-height:auto;width:16px;height:16px">
-                {{ group.dept }}
-            </label>
+            <optgroup label="{{ cg.company }}">
+                {% for group in cg.groups %}
+                <option value="neesa:{{ group.tab_key }}" {{ 'selected' if group.tab_key == active_store }}>{{ group.dept }}</option>
+                {% endfor %}
+            </optgroup>
             {% endfor %}
-            {% endfor %}
-        </div>
+        </select>
+        <select id="rangeSelect" style="min-width:100px">
+            <option value="week" selected>週（7日間）</option>
+        </select>
     </div>
 </div>
-
-{# ===== 店舗タブ(アソビバスターズ 各支店) ===== #}
-<div class="tab-group" data-tabgroup="store">
-<div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">アソビバスターズ</div>
-<div class="store-tabs" style="display:flex;gap:0;margin-bottom:16px;box-shadow:inset 0 -2px 0 rgba(163,177,198,.4);overflow-x:auto;-webkit-overflow-scrolling:touch">
-    {% for store in store_shifts %}
-    <a href="?store={{ store.store_name }}" data-tabkey="store:{{ store.store_name }}"
-       style="padding:12px 20px;text-decoration:none;font-size:14px;font-weight:600;
-              border-bottom:3px solid {{ 'var(--nm-accent)' if store.store_name == active_store else 'transparent' }};
-              color:{{ 'var(--nm-accent)' if store.store_name == active_store else 'var(--nm-text-dim)' }};
-              margin-bottom:-2px;white-space:nowrap;min-height:44px;display:flex;align-items:center">
-        {{ store.store_name }}
-        <span style="font-size:11px;color:var(--nm-text-dim);font-weight:normal;margin-left:4px">〜{{ store.closing_hour }}:00</span>
-    </a>
-    {% endfor %}
-</div>
-</div>
-
-{# ===== NeeSa/アソビバ本社/ディアメント 各部署タブ ===== #}
-{% for cg in neesa_companies %}
-<div class="tab-group" data-tabgroup="neesa-{{ cg.company }}">
-<div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">{{ cg.company }}</div>
-<div class="store-tabs" style="display:flex;gap:0;margin-bottom:16px;box-shadow:inset 0 -2px 0 rgba(163,177,198,.4);overflow-x:auto;-webkit-overflow-scrolling:touch">
-    {% for group in cg.groups %}
-    <a href="?store={{ group.tab_key }}" data-tabkey="neesa:{{ group.tab_key }}"
-       style="padding:12px 20px;text-decoration:none;font-size:14px;font-weight:600;
-              border-bottom:3px solid {{ 'var(--nm-accent)' if group.tab_key == active_store else 'transparent' }};
-              color:{{ 'var(--nm-accent)' if group.tab_key == active_store else 'var(--nm-text-dim)' }};
-              margin-bottom:-2px;white-space:nowrap;min-height:44px;display:flex;align-items:center">
-        {{ group.dept }}
-    </a>
-    {% endfor %}
-</div>
-</div>
-{% endfor %}
 
 {# ===== シフト表示: 店舗 ===== #}
 {% for store in store_shifts %}
 {% if store.store_name == active_store %}
 <div class="card" style="padding:0;overflow:hidden">
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <div style="padding:16px 20px 0">
+        <span style="font-weight:bold;color:var(--nm-text)">アソビバスターズ / {{ store.store_name }}</span>
+        <span style="font-size:12px;color:var(--nm-text-dim);margin-left:6px">{{ today[5:].replace('-', '/') }} から7日間・〜{{ store.closing_hour }}:00</span>
+    </div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px">
         <table style="margin-bottom:0">
             <thead>
                 <tr>
@@ -117,7 +84,11 @@
 {% for group in neesa_shifts %}
 {% if group.tab_key == active_store %}
 <div class="card" style="padding:0;overflow:hidden">
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <div style="padding:16px 20px 0">
+        <span style="font-weight:bold;color:var(--nm-text)">{{ group.company }} / {{ group.dept }}</span>
+        <span style="font-size:12px;color:var(--nm-text-dim);margin-left:6px">{{ today[5:].replace('-', '/') }} から7日間</span>
+    </div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px">
         <table style="margin-bottom:0">
             <thead>
                 <tr>
@@ -170,73 +141,20 @@
 </div>
 {% endif %}
 
-<style>
-@media (max-width: 768px) {
-    .store-tabs::-webkit-scrollbar { display: none; }
-    .store-tabs { scrollbar-width: none; }
-}
-</style>
-
 {% endblock %}
 
 {% block scripts %}
 <script>
 (function() {
-    var STORAGE_KEY = 'shiftsVisibleTabs';
-    var allKeys = Array.prototype.map.call(document.querySelectorAll('.tabCheck'), function(cb) { return cb.dataset.tabkey; });
-    var defaultVisible = allKeys.filter(function(k) { return k.indexOf('store:') === 0; });
-
-    var visible;
-    try {
-        var saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-        visible = Array.isArray(saved) ? saved : defaultVisible;
-    } catch (e) {
-        visible = defaultVisible;
-    }
-
-    function applyVisibility() {
-        document.querySelectorAll('.tabCheck').forEach(function(cb) {
-            cb.checked = visible.indexOf(cb.dataset.tabkey) !== -1;
-        });
-        document.querySelectorAll('[data-tabkey]').forEach(function(el) {
-            if (el.tagName === 'INPUT') return;
-            el.style.display = visible.indexOf(el.dataset.tabkey) !== -1 ? '' : 'none';
-        });
-        document.querySelectorAll('.tab-group').forEach(function(g) {
-            var anyVisible = Array.prototype.some.call(g.querySelectorAll('[data-tabkey]'), function(el) {
-                return el.style.display !== 'none';
-            });
-            g.style.display = anyVisible ? '' : 'none';
+    var deptSelect = document.getElementById('deptSelect');
+    if (deptSelect) {
+        deptSelect.addEventListener('change', function() {
+            var val = this.value; // "store:フジグラン" or "neesa:NeeSa|発送部"
+            var key = val.slice(val.indexOf(':') + 1);
+            window.location.href = '?store=' + encodeURIComponent(key);
         });
     }
-    applyVisibility();
-
-    document.querySelectorAll('.tabCheck').forEach(function(cb) {
-        cb.addEventListener('change', function() {
-            var key = this.dataset.tabkey;
-            if (this.checked) {
-                if (visible.indexOf(key) === -1) visible.push(key);
-            } else {
-                visible = visible.filter(function(k) { return k !== key; });
-            }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(visible));
-            applyVisibility();
-        });
-    });
-
-    var toggle = document.getElementById('tabFilterToggle');
-    var panel = document.getElementById('tabFilterPanel');
-    if (toggle) {
-        toggle.addEventListener('click', function(e) {
-            e.stopPropagation();
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        });
-        document.addEventListener('click', function(e) {
-            if (panel.style.display !== 'none' && !panel.contains(e.target) && e.target !== toggle) {
-                panel.style.display = 'none';
-            }
-        });
-    }
+    // rangeSelect: 現状「週(7日間)」のみ対応のため選択肢は1つ(将来の拡張用)
 })();
 </script>
 {% endblock %}

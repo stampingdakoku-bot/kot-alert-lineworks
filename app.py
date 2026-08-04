@@ -349,6 +349,9 @@ def _get_store_shifts_and_attendance(today_str):
 # --- Dashboard ---
 @app.route('/')
 def dashboard():
+    active_tab = request.args.get('tab')
+    if active_tab not in ('realtime', 'shift'):
+        active_tab = 'realtime'
     today_actual = date.today().isoformat()
     max_future_date = (date.today() + timedelta(days=7))
     date_param = (request.args.get('date') or '').strip()
@@ -406,20 +409,22 @@ def dashboard():
             .execute().data
 
     # NeeSa/アソビバ本社/@121 カード(/boardと同じデータをダッシュボードにも表示)
+    # シフト予定(登録シフト)自体は日付を問わず表示する。KoTの実打刻オーバーレイは
+    # 未来日には存在しない(まだ打刻されていない)ため、当日・過去日のみ適用する。
     neesa_groups = []
-    if is_today:
-        try:
-            import neesa_lw
-            import neesa_kot
-            now_jst = datetime.now(JST)
-            neesa_groups = neesa_lw.get_today_shifts(selected)
-            for g in neesa_groups:
-                for s in g['shifts']:
-                    s.setdefault('status', 'scheduled')
+    try:
+        import neesa_lw
+        import neesa_kot
+        now_jst = datetime.now(JST)
+        neesa_groups = neesa_lw.get_today_shifts(selected)
+        for g in neesa_groups:
+            for s in g['shifts']:
+                s.setdefault('status', 'scheduled')
+        if not is_future:
             neesa_groups = neesa_kot.apply_today(neesa_groups, now_jst)
-        except Exception as e:
-            app.logger.warning('dashboard NeeSaカード取得失敗: %s', e)
-            neesa_groups = []
+    except Exception as e:
+        app.logger.warning('dashboard NeeSaカード取得失敗: %s', e)
+        neesa_groups = []
 
     # ===== リアルタイム出勤状況(本体/NeeSa両テナント統合。/my/overviewと同じロジックを無認証で公開) =====
     unified_grouped = {}
@@ -427,10 +432,17 @@ def dashboard():
     if is_today:
         try:
             import attendance_unified
+            import neesa_lw
             for st in attendance_unified.get_unified_status():
                 key = f"{st['company']}|{st['dept']}"
                 unified_grouped.setdefault(key, []).append(st)
-            unified_group_list = [(key, key.replace('|', ' / ')) for key in unified_grouped.keys()]
+            unified_group_list = sorted(
+                [(key, key.replace('|', ' / ')) for key in unified_grouped.keys()],
+                key=lambda kv: (
+                    neesa_lw.COMPANY_ORDER.index(kv[0].split('|')[0]) if kv[0].split('|')[0] in neesa_lw.COMPANY_ORDER else 99,
+                    neesa_lw.DEPT_ORDER.index(kv[0].split('|')[1]) if kv[0].split('|')[1] in neesa_lw.DEPT_ORDER else 99,
+                )
+            )
         except Exception as e:
             app.logger.warning('リアルタイム出勤状況取得失敗: %s', e)
             unified_grouped = {}
@@ -495,6 +507,7 @@ def dashboard():
                            today_actual=today_actual,
                            max_future_date=max_future_date,
                            marquee_text=marquee_text,
+                           active_tab=active_tab,
                            unified_grouped=unified_grouped,
                            unified_group_list=unified_group_list,
                            is_past=is_past,

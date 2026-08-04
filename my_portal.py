@@ -72,6 +72,34 @@ def _get_staff(staff_id):
     return result.data[0] if result.data else None
 
 
+def _build_attendees(staff, extra_json):
+    """ログイン中の本人を必ず参加メンバーに含め、検索UIで追加選択された人をマージする"""
+    attendees = []
+    seen = set()
+    if staff.get('lw_account_id'):
+        attendees.append({'email': staff['lw_account_id'], 'displayName': staff['display_name']})
+        seen.add(staff['lw_account_id'])
+    try:
+        extra = json.loads(extra_json or '[]')
+    except (ValueError, TypeError):
+        extra = []
+    for a in extra:
+        email = (a or {}).get('email')
+        if email and email not in seen:
+            attendees.append({'email': email, 'displayName': a.get('displayName', '')})
+            seen.add(email)
+    return attendees or None
+
+
+def _build_reminders(triggers_json):
+    try:
+        triggers = json.loads(triggers_json or '[]')
+    except (ValueError, TypeError):
+        triggers = []
+    reminders = [{'method': 'DISPLAY', 'trigger': t} for t in triggers if t]
+    return reminders or None
+
+
 @my_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -212,7 +240,11 @@ def schedule():
         recurrence = None
         if repeat_freq in ('weekly', 'monthly') and repeat_days:
             recurrence = [lw_calendar_write.build_rrule(repeat_freq, repeat_days)]
-        ok, detail = lw_calendar_write.create_event(summary, start_dt, end_dt, recurrence=recurrence)
+        attendees = _build_attendees(staff, request.form.get('attendees'))
+        reminders = _build_reminders(request.form.get('reminders'))
+        ok, detail = lw_calendar_write.create_event(
+            summary, start_dt, end_dt, recurrence=recurrence,
+            attendees=attendees, reminders=reminders)
         if ok:
             flash('予定を登録しました', 'success')
         else:
@@ -295,7 +327,11 @@ def schedule_edit(event_id):
         recurrence = lw_calendar_write.remap_exdate_times(recurrence, start_dt.time())
 
     summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
-    ok, detail = lw_calendar_write.update_event(event_id, summary, start_dt, end_dt, recurrence=recurrence or None)
+    attendees = _build_attendees(staff, request.form.get('attendees'))
+    reminders = _build_reminders(request.form.get('reminders'))
+    ok, detail = lw_calendar_write.update_event(
+        event_id, summary, start_dt, end_dt, recurrence=recurrence or None,
+        attendees=attendees, reminders=reminders)
     if ok:
         flash('予定を更新しました', 'success')
     else:

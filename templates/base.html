@@ -116,7 +116,7 @@
 </head>
 <body>
     <nav>
-        <a href="/" class="brand">Work Log</a>
+        <a href="/my" class="brand">Work Log</a>
         <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="メニュー">&#9776;</button>
         <div class="nav-links">
             <a href="/" {% if request.path == '/' %}class="active"{% endif %}>今日の出勤一覧</a>

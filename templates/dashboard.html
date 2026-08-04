@@ -49,12 +49,12 @@
         {% endif %}
     </div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <a href="?date={{ prev_date }}" class="nm-surface" style="padding:6px 12px;color:var(--nm-text);text-decoration:none;border-radius:12px;font-size:13px">◀ 前日</a>
+        <a href="?date={{ prev_date }}&tab={{ active_tab }}" class="nm-surface dateNavLink" style="padding:6px 12px;color:var(--nm-text);text-decoration:none;border-radius:12px;font-size:13px">◀ 前日</a>
         <input type="date" id="dateNav" value="{{ today }}" max="{{ max_future_date }}" style="padding:5px 8px;font-size:13px">
         {% if next_date > max_future_date %}
         <span class="nm-inset" style="padding:6px 12px;color:var(--nm-text-dim);border-radius:12px;font-size:13px;cursor:not-allowed">翌日 ▶</span>
         {% else %}
-        <a href="?date={{ next_date }}" class="nm-surface" style="padding:6px 12px;color:var(--nm-text);text-decoration:none;border-radius:12px;font-size:13px">翌日 ▶</a>
+        <a href="?date={{ next_date }}&tab={{ active_tab }}" class="nm-surface dateNavLink" style="padding:6px 12px;color:var(--nm-text);text-decoration:none;border-radius:12px;font-size:13px">翌日 ▶</a>
         {% endif %}
         <span id="lastUpdate" style="font-size:12px;color:var(--nm-text-dim);margin-left:8px"></span>
     </div>
@@ -69,8 +69,19 @@
 <div id="tabpane-realtime">
     {# ===== リアルタイム表示カスタマイズ(ブラウザ単位・localStorage) ===== #}
     <div class="card" style="padding:12px 16px;margin-bottom:16px">
-        <div id="rtCustomizeToggle" style="cursor:pointer;font-size:14px;font-weight:bold;color:var(--nm-text);display:flex;align-items:center;gap:6px">
+        <div id="rtCustomizeToggle" style="cursor:pointer;font-size:14px;font-weight:bold;color:var(--nm-text);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span id="rtCustomizeArrow">▶</span> 表示する部署をカスタマイズ
+            <span style="display:flex;gap:14px;margin-left:12px;font-weight:normal;font-size:13px;color:var(--nm-text-dim)" onclick="event.stopPropagation()">
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="checkbox" id="rtQuickAll" class="rtQuickSelect" data-company="" style="min-height:auto;width:16px;height:16px">すべて
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="checkbox" id="rtQuickNeesa" class="rtQuickSelect" data-company="NeeSa" style="min-height:auto;width:16px;height:16px">NeeSa
+                </label>
+                <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                    <input type="checkbox" id="rtQuickAsobiba" class="rtQuickSelect" data-company="アソビバスターズ" style="min-height:auto;width:16px;height:16px">アソビバ
+                </label>
+            </span>
         </div>
         <div id="rtCustomizePanel" style="display:none;margin-top:12px;flex-wrap:wrap;gap:6px 16px">
             {% for key, label in unified_group_list %}
@@ -389,7 +400,7 @@
     if (dateNav) {
         dateNav.addEventListener('change', function() {
             if (this.value) {
-                window.location.href = '?date=' + this.value;
+                window.location.href = '?date=' + this.value + '&tab=' + (window.currentDashTab || '{{ active_tab }}');
             }
         });
     }
@@ -463,6 +474,8 @@
     var rtHidden = [];
     try { rtHidden = JSON.parse(localStorage.getItem(RT_STORAGE_KEY) || '[]'); } catch (e) { rtHidden = []; }
 
+    function rtCompanyOf(key) { return key.split('|')[0]; }
+
     function applyRtVisibility() {
         document.querySelectorAll('.rtCheck').forEach(function(cb) {
             var visible = rtHidden.indexOf(cb.dataset.rtgroup) === -1;
@@ -470,7 +483,19 @@
             var card = document.querySelector('.card[data-rtgroup="' + CSS.escape(cb.dataset.rtgroup) + '"]');
             if (card) card.style.display = visible ? '' : 'none';
         });
+        syncRtQuickSelect();
     }
+
+    function syncRtQuickSelect() {
+        document.querySelectorAll('.rtQuickSelect').forEach(function(q) {
+            var company = q.dataset.company;
+            var checks = Array.prototype.filter.call(document.querySelectorAll('.rtCheck'), function(cb) {
+                return company === '' || rtCompanyOf(cb.dataset.rtgroup) === company;
+            });
+            q.checked = checks.length > 0 && checks.every(function(cb) { return cb.checked; });
+        });
+    }
+
     document.querySelectorAll('.rtCheck').forEach(function(cb) {
         cb.addEventListener('change', function() {
             var group = this.dataset.rtgroup;
@@ -479,6 +504,23 @@
             } else if (rtHidden.indexOf(group) === -1) {
                 rtHidden.push(group);
             }
+            localStorage.setItem(RT_STORAGE_KEY, JSON.stringify(rtHidden));
+            applyRtVisibility();
+        });
+    });
+    document.querySelectorAll('.rtQuickSelect').forEach(function(q) {
+        q.addEventListener('change', function() {
+            var company = this.dataset.company;
+            var checked = this.checked;
+            document.querySelectorAll('.rtCheck').forEach(function(cb) {
+                if (company !== '' && rtCompanyOf(cb.dataset.rtgroup) !== company) return;
+                var group = cb.dataset.rtgroup;
+                if (checked) {
+                    rtHidden = rtHidden.filter(function(g) { return g !== group; });
+                } else if (rtHidden.indexOf(group) === -1) {
+                    rtHidden.push(group);
+                }
+            });
             localStorage.setItem(RT_STORAGE_KEY, JSON.stringify(rtHidden));
             applyRtVisibility();
         });
@@ -496,15 +538,21 @@
         });
     }
 
-    // タブ切り替え(常にリアルタイムをデフォルト表示)
+    // タブ切り替え(ロゴ/ナビ経由の初回アクセスはリアルタイムがデフォルト。
+    // 前日/翌日/日付選択でページ遷移する際は、今表示中のタブを維持したまま戻る)
+    window.currentDashTab = '{{ active_tab }}';
     window.switchDashTab = function(name) {
+        window.currentDashTab = name;
         document.getElementById('tabpane-realtime').style.display = name === 'realtime' ? '' : 'none';
         document.getElementById('tabpane-shift').style.display = name === 'shift' ? '' : 'none';
         document.querySelectorAll('.segment').forEach(function(b) {
             b.classList.toggle('active', b.dataset.tab === name);
         });
+        document.querySelectorAll('.dateNavLink').forEach(function(a) {
+            a.href = a.href.replace(/([?&]tab=)[^&]*/, '$1' + name);
+        });
     };
-    switchDashTab('realtime');
+    switchDashTab(window.currentDashTab);
 })();
 </script>
 

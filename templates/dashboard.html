@@ -173,7 +173,13 @@
 <div class="store-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
     {% for g in neesa_groups %}
     <div class="card" data-group="{{ g.company }}|{{ g.dept }}" style="padding:20px">
-        <h2 style="margin:0 0 12px;font-size:18px">{{ g.company }} / {{ g.dept }}</h2>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <h2 style="margin:0;font-size:18px">{{ g.company }} / {{ g.dept }}</h2>
+            {% set g_clocked_in = g.shifts|selectattr('status', 'in', ['working', 'done'])|list %}
+            {% if g_clocked_in %}
+            {{ avatar_group(g_clocked_in) }}
+            {% endif %}
+        </div>
         {% if g.shifts %}
         <div class="table-wrap">
         <table style="margin-bottom:0">

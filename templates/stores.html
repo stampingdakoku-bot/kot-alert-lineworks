@@ -41,9 +41,9 @@
                 <span style="font-size:16px;font-weight:600">{{ s.store_name }}</span>
                 <span class="badge {{ 'badge-active' if s.is_active else 'badge-inactive' }}">{{ '有効' if s.is_active else '無効' }}</span>
             </div>
-            <div style="font-size:12px;color:#666;margin-bottom:4px">閉店: {{ s.closing_hour }}:00</div>
-            <div style="font-size:11px;color:#999;margin-bottom:4px;word-break:break-all">ID: {{ s.calendar_id }}</div>
-            <div style="font-size:11px;color:#999;margin-bottom:10px;word-break:break-all">API: {{ s.user_for_api }}</div>
+            <div style="font-size:12px;color:var(--nm-text-dim);margin-bottom:4px">閉店: {{ s.closing_hour }}:00</div>
+            <div style="font-size:11px;color:var(--nm-text-dim);margin-bottom:4px;word-break:break-all">ID: {{ s.calendar_id }}</div>
+            <div style="font-size:11px;color:var(--nm-text-dim);margin-bottom:10px;word-break:break-all">API: {{ s.user_for_api }}</div>
             <div style="display:flex;gap:6px">
                 <button class="btn btn-primary" onclick="openStoreEdit('{{ s.store_name }}', '{{ s.calendar_id }}', '{{ s.user_for_api }}', {{ s.closing_hour }}, {{ 'true' if s.is_active else 'false' }})">編集</button>
                 <form method="POST" action="/stores/{{ s.store_name }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
@@ -93,7 +93,8 @@
 
 <style>
 .store-cards-sp { display: none; }
-.store-card { background: #f8f9fa; border-radius: 8px; padding: 14px; margin-bottom: 10px; border: 1px solid #eee; }
+.store-card { background: var(--nm-bg); border-radius: 14px; padding: 14px; margin-bottom: 10px;
+              box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
 @media (max-width: 768px) {
     .store-table-pc { display: none; }
     .store-cards-sp { display: block; }

@@ -7,59 +7,78 @@
   <title>Work Log</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
   <style>
+    :root {
+      --nm-bg: #e0e5ec;
+      --nm-text: #3d4457;
+      --nm-text-dim: #7e879d;
+      --nm-shadow-light: rgba(255,255,255,.85);
+      --nm-shadow-dark: rgba(163,177,198,.6);
+      --nm-accent: #4a7dfc;
+      --nm-radius: 18px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; overflow-x: hidden; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation-duration: .001ms !important; }
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #f5f5f5; color: #333;
+      background: var(--nm-bg); color: var(--nm-text);
     }
+    :focus-visible { outline: 2px solid var(--nm-accent); outline-offset: 2px; }
 
-    /* ===== トップバー（トレコレ管理画面のナビと同色） ===== */
+    /* ===== トップバー ===== */
     nav {
-      background: #2c3e50; padding: 12px 24px;
+      background: var(--nm-bg); padding: 12px 24px;
       display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      box-shadow: 0 6px 12px rgba(163,177,198,.4), 0 1px 0 rgba(255,255,255,.7) inset;
     }
-    nav .brand { font-weight: bold; font-size: clamp(16px, 2.4vw, 20px); color: #3498db; }
+    nav .brand { font-weight: bold; font-size: clamp(16px, 2.4vw, 20px); color: var(--nm-text); }
     nav .count {
-      font-size: clamp(12px, 1.7vw, 15px); font-weight: 600; color: #fff;
-      background: #34495e; padding: 3px 12px; border-radius: 10px;
+      font-size: clamp(12px, 1.7vw, 15px); font-weight: 600; color: var(--nm-text);
+      background: var(--nm-bg); padding: 4px 14px; border-radius: 12px;
+      box-shadow: inset 2px 2px 4px var(--nm-shadow-dark), inset -2px -2px 4px var(--nm-shadow-light);
     }
     nav .trecole-link {
       margin-left: auto; font-size: clamp(12px, 1.6vw, 14px);
-      color: #fff; text-decoration: none; background: #3498db;
-      padding: 7px 14px; border-radius: 4px; white-space: nowrap;
+      color: #fff; text-decoration: none; background: var(--nm-accent);
+      padding: 8px 16px; border-radius: 12px; white-space: nowrap;
+      box-shadow: -4px -4px 8px rgba(255,255,255,.5), 4px 4px 8px rgba(74,125,252,.5);
     }
-    nav .trecole-link:hover { opacity: .85; }
+    nav .trecole-link:hover { opacity: .9; }
     nav .park-link {
       font-size: clamp(11px, 1.6vw, 14px); font-weight: 700;
-      color: #fff; text-decoration: none; background: #f39c12;
-      padding: 7px 14px; border-radius: 4px; white-space: nowrap;
+      color: #fff; text-decoration: none; background: #e8952f;
+      padding: 8px 16px; border-radius: 12px; white-space: nowrap;
+      box-shadow: -4px -4px 8px rgba(255,255,255,.4), 4px 4px 8px rgba(210,130,20,.5);
     }
-    nav .park-link:hover { opacity: .85; }
+    nav .park-link:hover { opacity: .9; }
 
     .container { max-width: 1200px; margin: 20px auto; padding: 0 24px; }
 
-    /* ===== 日付ナビ（トレコレと同じボタン） ===== */
+    /* ===== 日付ナビ ===== */
     .datenav {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
       margin-bottom: 14px;
     }
     .datenav a, .datenav input {
-      font-family: inherit; font-size: 13px; color: #333; text-decoration: none;
-      background: #ecf0f1; padding: 8px 14px; border-radius: 4px; border: none;
+      font-family: inherit; font-size: 13px; color: var(--nm-text); text-decoration: none;
+      background: var(--nm-bg); padding: 8px 14px; border-radius: 12px; border: none;
+      box-shadow: -4px -4px 8px var(--nm-shadow-light), 4px 4px 8px var(--nm-shadow-dark);
     }
-    .datenav a:hover { background: #dfe6e9; }
-    .datenav a.today { background: #3498db; color: #fff; }
-    .datenav input { background: #fff; border: 1px solid #ddd; padding: 7px 10px; }
+    .datenav a:active { box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
+    .datenav a.today { color: var(--nm-accent); font-weight: bold;
+      box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
+    .datenav input { padding: 7px 10px; box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
     .not-today {
       font-size: 13px; color: #fff; font-weight: 600;
-      background: #f39c12; padding: 5px 12px; border-radius: 10px;
+      background: #e8952f; padding: 5px 12px; border-radius: 10px;
     }
 
     /* ===== 凡例 ===== */
     .legend {
       display: flex; flex-wrap: wrap; gap: 16px;
-      font-size: 13px; margin-bottom: 16px; color: #666;
+      font-size: 13px; margin-bottom: 16px; color: var(--nm-text-dim);
     }
     .legend span { display: inline-flex; align-items: center; gap: 6px; }
     .legend .dot { font-size: 16px; line-height: 1; }
@@ -68,14 +87,15 @@
     .c-scheduled { color: #95a5a6; }
 
     .unmapped-note {
-      background: #fff3cd; color: #856404; border-radius: 8px;
+      background: var(--nm-bg); color: #8a5a00; border-radius: 14px;
       padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+      box-shadow: -4px -4px 8px var(--nm-shadow-light), 4px 4px 8px var(--nm-shadow-dark);
     }
-    .unmapped-note b { color: #664d03; }
+    .unmapped-note b { color: #8a5a00; }
 
     /* ===== 会社見出し ===== */
     .company {
-      font-size: clamp(16px, 2.4vw, 20px); font-weight: bold; color: #2c3e50;
+      font-size: clamp(16px, 2.4vw, 20px); font-weight: bold; color: var(--nm-text);
       margin: clamp(12px, 2vw, 22px) 0 10px;
       display: flex; align-items: center; gap: 9px;
     }
@@ -84,39 +104,40 @@
       background: var(--bar, #95a5a6); border-radius: 3px;
     }
 
-    /* ===== 部署カード（トレコレの店舗カードと同じ .card） ===== */
+    /* ===== 部署カード ===== */
     .store-grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
     }
     .card {
-      background: #fff; border-radius: 8px; padding: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      background: var(--nm-bg); border-radius: var(--nm-radius); padding: 20px;
+      box-shadow: -8px -8px 16px var(--nm-shadow-light), 8px 8px 16px var(--nm-shadow-dark);
     }
     .card .card-head {
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 12px; gap: 10px;
     }
-    .card .card-head h2 { margin: 0; font-size: 18px; color: #2c3e50; }
+    .card .card-head h2 { margin: 0; font-size: 18px; color: var(--nm-text); }
     .card .badge {
       font-size: 12px; color: #fff; padding: 2px 10px; border-radius: 12px;
       white-space: nowrap;
     }
 
     table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; }
-    th { background: #f8f9fa; font-weight: 600; font-size: 13px; color: #555; }
-    tbody tr:last-child td { border-bottom: none; }
+    th, td { padding: 10px 12px; text-align: left; }
+    th { background: transparent; font-weight: 600; font-size: 13px; color: var(--nm-text-dim); }
+    tbody tr { box-shadow: inset 0 -1px 0 rgba(163,177,198,.3); }
+    tbody tr:last-child { box-shadow: none; }
     td.st { width: 30px; text-align: center; font-size: 22px; }
     td.nm { font-size: 14px; }
     td.nm .home { font-size: 13px; margin-left: 3px; }
     td.nm .um {
       font-size: 10px; font-weight: 600; margin-left: 5px;
-      background: #fff3cd; color: #856404; padding: 1px 7px; border-radius: 10px;
-      border: 1px solid #ffe69c; vertical-align: middle;
+      background: #f3e0a8; color: #8a5a00; padding: 1px 7px; border-radius: 10px;
+      vertical-align: middle;
     }
-    td.sh { font-size: 13px; color: #666; white-space: nowrap; }
+    td.sh { font-size: 13px; color: var(--nm-text-dim); white-space: nowrap; }
     td.stt { font-size: 12px; white-space: nowrap; }
-    .empty { text-align: center; color: #999; padding: 24px 0; font-size: 14px; }
+    .empty { text-align: center; color: var(--nm-text-dim); padding: 24px 0; font-size: 14px; }
 
     @media (max-width: 768px) {
       .container { padding: 0 12px; margin: 14px auto; }
@@ -140,7 +161,7 @@
       <a href="?date={{ next_day }}">翌日 ▶</a>
       <input type="date" value="{{ target }}"
              onchange="if(this.value)location.href='?date='+this.value">
-      <span style="font-size:13px;color:#999;margin-left:4px">{{ today }}</span>
+      <span style="font-size:13px;color:var(--nm-text-dim);margin-left:4px">{{ today }}</span>
       {% if not is_today %}<span class="not-today">過去/未来の予定（色は当日のみ）</span>{% endif %}
     </div>
 

@@ -1,21 +1,26 @@
 {% extends 'base.html' %}
 {% block title %}マイメニュー{% endblock %}
 {% block content %}
-<style>body { background: {{ staff.bg_color or '#f5f5f5' }} !important; }</style>
+<style>
+{% set _bg = (staff.bg_color or '').split('|') %}
+{% if _bg|length == 2 %}
+:root { --nm-bg: {{ _bg[1] }}; --nm-text: {{ _bg[0] }}; }
+{% endif %}
+</style>
 <div class="card">
     <h2>{{ staff.display_name }} さん（{{ staff.company }} / {{ staff.dept }}）</h2>
 
     <div style="margin-top:16px">
-        <div style="font-weight:bold;color:#2c3e50;margin-bottom:8px">勤怠</div>
+        <div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">勤怠</div>
         {% if staff.kot_employee_key %}
         <p style="margin-bottom:12px">
             本日の出勤: <strong>{{ clock_in[11:16] if clock_in else '未打刻' }}</strong>
             本日の退勤: <strong>{{ clock_out[11:16] if clock_out else '未打刻' }}</strong>
         </p>
         {% if not clock_in %}
-        <p style="color:#2c3e50;font-size:14px;margin-bottom:12px">おはようございます。本日もよろしくお願いします。</p>
+        <p style="color:var(--nm-text);font-size:14px;margin-bottom:12px">おはようございます。本日もよろしくお願いします。</p>
         {% elif clock_out %}
-        <p style="color:#2c3e50;font-size:14px;margin-bottom:12px">
+        <p style="color:var(--nm-text);font-size:14px;margin-bottom:12px">
             本日もお疲れ様でした。{% if next_shift_date %}次回は{{ next_shift_date }}{% else %}次回{% endif %}もよろしくお願いします。
         </p>
         {% endif %}
@@ -30,7 +35,7 @@
             </form>
         </div>
         {% else %}
-        <p style="color:#999;font-size:13px">KoTアカウントと未紐付けのため、打刻はできません</p>
+        <p style="color:var(--nm-text-dim);font-size:13px">KoTアカウントと未紐付けのため、打刻はできません</p>
         {% endif %}
     </div>
 
@@ -46,32 +51,34 @@
     </div>
 
     <div style="margin-top:24px">
-        <div style="font-size:14px;color:#666;text-align:center;margin-bottom:16px">カラースタイルを選択してください</div>
+        <div style="font-size:14px;color:var(--nm-text-dim);text-align:center;margin-bottom:16px">カラースタイルを選択してください</div>
         <form method="POST" action="{{ url_for('my.set_color') }}" id="colorForm">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:420px;margin:0 auto">
-            {% for name, hex in [
-                ('サクラ', '#F4A6A0'), ('ミント', '#3FBF9F'), ('タンポポ', '#E0A73C'), ('アジサイ', '#6FA9E0'),
-                ('プルーン', '#3457A6'), ('アセロラ', '#E0605D'), ('オリーブ', '#7C8C4A'), ('ブラックベリー', '#2B3A55')
+        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:420px;margin:0 auto">
+            {% for top, bottom in [
+                ('#000080', '#F5F5DC'), ('#4e1319', '#b2f3e9'), ('#28633d', '#da98c1'),
+                ('#c7bfd2', '#363c2e'), ('#383838', '#c06c22'), ('#d4e7f3', '#2d1405')
             ] %}
-            <label style="text-align:center;cursor:pointer">
-                <input type="radio" name="bg_color" value="{{ hex }}" style="display:none"
-                       {{ 'checked' if staff.bg_color == hex }}
+            {% set val = top ~ '|' ~ bottom %}
+            <label style="cursor:pointer">
+                <input type="radio" name="bg_color" value="{{ val }}" style="display:none"
+                       {{ 'checked' if staff.bg_color == val }}
                        onchange="this.form.requestSubmit()">
-                <div style="width:52px;height:52px;border-radius:50%;background:{{ hex }};margin:0 auto 6px;
-                            position:relative;{{ 'box-shadow:0 0 0 3px white,0 0 0 5px #3498db' if staff.bg_color == hex }}">
-                    {% if staff.bg_color == hex %}
-                    <span style="position:absolute;bottom:-2px;right:-2px;background:#3498db;color:white;
+                <div style="width:60px;height:60px;border-radius:10px;overflow:hidden;position:relative;
+                            {{ 'outline:3px solid var(--nm-accent);outline-offset:3px' if staff.bg_color == val }}">
+                    <div style="height:50%;background:{{ top }}"></div>
+                    <div style="height:50%;background:{{ bottom }}"></div>
+                    {% if staff.bg_color == val %}
+                    <span style="position:absolute;bottom:-2px;right:-2px;background:var(--nm-accent);color:white;
                                   border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;
-                                  border:2px solid white">✓</span>
+                                  text-align:center">✓</span>
                     {% endif %}
                 </div>
-                <div style="font-size:12px;color:#666">{{ name }}</div>
             </label>
             {% endfor %}
         </div>
         </form>
     </div>
 
-    <a href="{{ url_for('my.logout') }}" class="btn" style="background:#95a5a6;color:white;margin-top:16px">ログアウト（別の人に切り替え）</a>
+    <a href="{{ url_for('my.logout') }}" class="btn" style="margin-top:16px">ログアウト（別の人に切り替え）</a>
 </div>
 {% endblock %}

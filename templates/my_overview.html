@@ -2,12 +2,16 @@
 {% block title %}出勤状況一覧{% endblock %}
 {% block content %}
 <style>
-body { background: {{ staff.bg_color or '#f5f5f5' }} !important; }
+{% set _bg = (staff.bg_color or '').split('|') %}
+{% if _bg|length == 2 %}
+:root { --nm-bg: {{ _bg[1] }}; --nm-text: {{ _bg[0] }}; }
+{% endif %}
 @keyframes blink-green { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
-.person-card { position:relative; border:1px solid #ddd; border-radius:8px; padding:12px 12px 12px 28px;
-               min-width:160px; background:white; }
-.person-dot { position:absolute; top:12px; left:10px; width:10px; height:10px; border-radius:50%; }
-.person-dot.live { background:#27ae60; animation:blink-green 1.2s infinite; }
+.person-card { position:relative; border-radius:12px; padding:12px 12px 12px 28px; min-width:160px;
+               background: var(--nm-bg);
+               box-shadow: -5px -5px 10px var(--nm-shadow-light), 5px 5px 10px var(--nm-shadow-dark); }
+.person-dot { position:absolute; top:14px; left:12px; width:10px; height:10px; border-radius:50%; background: var(--nm-text-dim); }
+.person-dot.live { background:#3fb987; animation:blink-green 1.2s infinite; }
 </style>
 <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
     <div class="card" style="width:220px;flex-shrink:0">
@@ -34,7 +38,7 @@ body { background: {{ staff.bg_color or '#f5f5f5' }} !important; }
                 <div class="person-card">
                     <span class="person-dot {{ 'live' if m.status == 'working' }}"></span>
                     <div style="font-size:14px;font-weight:600">{{ m.display_name }}</div>
-                    <div style="font-size:12px;color:#999">{{ m.dept }}</div>
+                    <div style="font-size:12px;color:var(--nm-text-dim)">{{ m.dept }}</div>
                     <div style="font-size:12px;margin-top:4px">
                         {% if m.status == 'working' %}<span style="color:#27ae60">出勤中 {{ m.clock_in[11:16] if m.clock_in }}</span>
                         {% elif m.status == 'done' %}<span style="color:#3498db">退勤済</span>
@@ -48,7 +52,7 @@ body { background: {{ staff.bg_color or '#f5f5f5' }} !important; }
         {% endfor %}
     </div>
 </div>
-<a href="{{ url_for('my.home') }}" class="btn" style="background:#95a5a6;color:white">戻る</a>
+<a href="{{ url_for('my.home') }}" class="btn">戻る</a>
 {% endblock %}
 
 {% block scripts %}

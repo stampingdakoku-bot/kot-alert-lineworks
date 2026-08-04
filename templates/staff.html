@@ -2,9 +2,9 @@
 {% block title %}スタッフ管理{% endblock %}
 {% block content %}
 {% if variant_warnings %}
-<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:6px;padding:12px 16px;margin-bottom:16px">
-    <strong style="color:#e65100;font-size:14px">異体字不一致の可能性</strong>
-    <div style="font-size:12px;color:#888;margin-bottom:8px">カレンダーで通常漢字が使われている場合、自動正規化でマッチしますが確認を推奨します</div>
+<div class="nm-surface" style="border-radius:14px;padding:12px 16px;margin-bottom:16px">
+    <strong style="color:#b3651b;font-size:14px">異体字不一致の可能性</strong>
+    <div style="font-size:12px;color:var(--nm-text-dim);margin-bottom:8px">カレンダーで通常漢字が使われている場合、自動正規化でマッチしますが確認を推奨します</div>
     <table style="width:100%;font-size:13px">
         <thead><tr><th style="width:70px">コード</th><th>DB登録名</th><th>正規化後</th></tr></thead>
         <tbody>
@@ -35,7 +35,7 @@
         <tbody>
             {% for emp in employees %}
             {% set is_excluded = emp.get('is_excluded', false) %}
-            <tr style="{{ 'opacity:0.45;background:#f5f5f5' if is_excluded else '' }}">
+            <tr style="{{ 'opacity:0.45' if is_excluded else '' }}">
                 <td>{{ emp.employee_code or '' }}</td>
                 <td>{{ emp.last_name or '' }} {{ emp.first_name or '' }}</td>
                 <td style="font-size:12px">{{ emp.employee_key[:16] }}...</td>
@@ -43,7 +43,7 @@
                     {% if emp.mappings %}
                         {{ emp.mappings.lw_account_id }}
                     {% elif is_excluded %}
-                        <span style="color:#999">— 除外中</span>
+                        <span style="color:var(--nm-text-dim)">— 除外中</span>
                     {% else %}
                         <span style="color:#e74c3c">未設定</span>
                     {% endif %}
@@ -52,9 +52,9 @@
                     <button class="btn btn-primary" onclick="openEdit('{{ emp.employee_key }}', '{{ emp.employee_code or '' }}', '{{ emp.last_name or '' }}', '{{ emp.first_name or '' }}', '{{ emp.mappings.lw_account_id if emp.mappings else '' }}')">編集</button>
                     <form method="POST" action="/staff/{{ emp.employee_key }}/toggle_exclude" style="display:inline">
                         {% if is_excluded %}
-                        <button class="btn" style="background:#95a5a6;color:white" title="クリックで除外解除">除外中</button>
+                        <button class="btn" style="background:#98a2b3;color:white;box-shadow:-4px -4px 8px rgba(255,255,255,.4),4px 4px 8px rgba(120,130,145,.5)" title="クリックで除外解除">除外中</button>
                         {% else %}
-                        <button class="btn" style="background:#f39c12;color:white" title="クリックで除外">除外</button>
+                        <button class="btn" style="background:#e8952f;color:white;box-shadow:-4px -4px 8px rgba(255,255,255,.4),4px 4px 8px rgba(190,120,20,.5)" title="クリックで除外">除外</button>
                         {% endif %}
                     </form>
                     <form method="POST" action="/staff/{{ emp.employee_key }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
@@ -64,7 +64,7 @@
             </tr>
             {% endfor %}
             {% if not employees %}
-            <tr><td colspan="5" style="text-align:center;color:#999">スタッフが登録されていません</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:var(--nm-text-dim)">スタッフが登録されていません</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -80,15 +80,15 @@
                 <span class="staff-card-name">{{ emp.last_name or '' }} {{ emp.first_name or '' }}</span>
             </div>
             <div class="staff-card-detail">
-                <span style="color:#999;font-size:12px">KoT:</span>
+                <span style="color:var(--nm-text-dim);font-size:12px">KoT:</span>
                 <span style="font-size:12px">{{ emp.employee_key[:16] }}...</span>
             </div>
             <div class="staff-card-detail">
-                <span style="color:#999;font-size:12px">LW:</span>
+                <span style="color:var(--nm-text-dim);font-size:12px">LW:</span>
                 {% if emp.mappings %}
                     <span style="font-size:12px;word-break:break-all">{{ emp.mappings.lw_account_id }}</span>
                 {% elif is_excluded %}
-                    <span style="color:#999;font-size:12px">— 除外中</span>
+                    <span style="color:var(--nm-text-dim);font-size:12px">— 除外中</span>
                 {% else %}
                     <span style="color:#e74c3c;font-size:12px">未設定</span>
                 {% endif %}
@@ -97,9 +97,9 @@
                 <button class="btn btn-primary" onclick="openEdit('{{ emp.employee_key }}', '{{ emp.employee_code or '' }}', '{{ emp.last_name or '' }}', '{{ emp.first_name or '' }}', '{{ emp.mappings.lw_account_id if emp.mappings else '' }}')">編集</button>
                 <form method="POST" action="/staff/{{ emp.employee_key }}/toggle_exclude" style="display:inline">
                     {% if is_excluded %}
-                    <button class="btn" style="background:#95a5a6;color:white">除外中</button>
+                    <button class="btn" style="background:#98a2b3;color:white;box-shadow:-4px -4px 8px rgba(255,255,255,.4),4px 4px 8px rgba(120,130,145,.5)">除外中</button>
                     {% else %}
-                    <button class="btn" style="background:#f39c12;color:white">除外</button>
+                    <button class="btn" style="background:#e8952f;color:white;box-shadow:-4px -4px 8px rgba(255,255,255,.4),4px 4px 8px rgba(190,120,20,.5)">除外</button>
                     {% endif %}
                 </form>
                 <form method="POST" action="/staff/{{ emp.employee_key }}/delete" style="display:inline" onsubmit="return confirm('削除しますか？')">
@@ -109,7 +109,7 @@
         </div>
         {% endfor %}
         {% if not employees %}
-        <div style="text-align:center;color:#999;padding:24px">スタッフが登録されていません</div>
+        <div style="text-align:center;color:var(--nm-text-dim);padding:24px">スタッフが登録されていません</div>
         {% endif %}
     </div>
 </div>
@@ -151,9 +151,10 @@
 
 <style>
 .staff-cards-sp { display: none; }
-.staff-card { background: #f8f9fa; border-radius: 8px; padding: 14px; margin-bottom: 10px; border: 1px solid #eee; }
+.staff-card { background: var(--nm-bg); border-radius: 14px; padding: 14px; margin-bottom: 10px;
+              box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
 .staff-card-header { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
-.staff-card-code { color: #3498db; margin-right: 8px; }
+.staff-card-code { color: var(--nm-accent); margin-right: 8px; }
 .staff-card-detail { margin-bottom: 4px; display: flex; gap: 6px; align-items: baseline; }
 .staff-card-actions { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 

@@ -5,16 +5,16 @@
 <h2 style="margin-bottom:16px">シフト一覧 — {{ today[5:].replace('-', '/') }} から7日間</h2>
 
 {# ===== 店舗タブ(アソビバスターズ 各支店) ===== #}
-<div style="font-weight:bold;color:#2c3e50;margin-bottom:8px">アソビバスターズ</div>
-<div class="store-tabs" style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #ddd;overflow-x:auto;-webkit-overflow-scrolling:touch">
+<div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">アソビバスターズ</div>
+<div class="store-tabs" style="display:flex;gap:0;margin-bottom:16px;box-shadow:inset 0 -2px 0 rgba(163,177,198,.4);overflow-x:auto;-webkit-overflow-scrolling:touch">
     {% for store in store_shifts %}
     <a href="?store={{ store.store_name }}"
        style="padding:12px 20px;text-decoration:none;font-size:14px;font-weight:600;
-              border-bottom:3px solid {{ '#3498db' if store.store_name == active_store else 'transparent' }};
-              color:{{ '#3498db' if store.store_name == active_store else '#666' }};
+              border-bottom:3px solid {{ 'var(--nm-accent)' if store.store_name == active_store else 'transparent' }};
+              color:{{ 'var(--nm-accent)' if store.store_name == active_store else 'var(--nm-text-dim)' }};
               margin-bottom:-2px;white-space:nowrap;min-height:44px;display:flex;align-items:center">
         {{ store.store_name }}
-        <span style="font-size:11px;color:#999;font-weight:normal;margin-left:4px">〜{{ store.closing_hour }}:00</span>
+        <span style="font-size:11px;color:var(--nm-text-dim);font-weight:normal;margin-left:4px">〜{{ store.closing_hour }}:00</span>
     </a>
     {% endfor %}
 </div>
@@ -27,38 +27,38 @@
         <table style="margin-bottom:0">
             <thead>
                 <tr>
-                    <th style="width:100px;position:sticky;left:0;background:#f8f9fa;z-index:1">日付</th>
+                    <th style="width:100px;position:sticky;left:0;background:var(--nm-bg);z-index:1">日付</th>
                     <th>スタッフ / シフト</th>
                 </tr>
             </thead>
             <tbody>
                 {% for day in store.days %}
-                <tr style="{{ 'background:#eaf4fd' if day.is_today else '' }}">
+                <tr style="{{ 'background:rgba(74,125,252,.12)' if day.is_today else '' }}">
                     <td style="position:sticky;left:0;z-index:1;white-space:nowrap;font-weight:600;
-                               {{ 'background:#eaf4fd' if day.is_today else 'background:white' }}">
+                               {{ 'background:rgba(74,125,252,.12)' if day.is_today else 'background:var(--nm-bg)' }}">
                         <div style="font-size:14px">
                             {{ day.date[5:].replace('-', '/') }}
                             <span style="font-size:12px;margin-left:2px;
-                                         color:{{ '#e74c3c' if day.weekday == '日' else '#3498db' if day.weekday == '土' else '#333' }}">
+                                         color:{{ '#e74c3c' if day.weekday == '日' else '#3498db' if day.weekday == '土' else 'var(--nm-text)' }}">
                                 ({{ day.weekday }})
                             </span>
                         </div>
                         {% if day.is_today %}
-                        <span style="font-size:10px;background:#3498db;color:white;padding:1px 6px;border-radius:3px">TODAY</span>
+                        <span style="font-size:10px;background:var(--nm-accent);color:white;padding:1px 6px;border-radius:3px">TODAY</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if day.shifts %}
                         <div style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">
                             {% for shift in day.shifts %}
-                            <div style="display:inline-flex;align-items:center;gap:6px;background:#f8f9fa;border-radius:6px;padding:8px 12px;font-size:13px;border:1px solid #eee">
+                            <div class="nm-surface" style="display:inline-flex;align-items:center;gap:6px;border-radius:10px;padding:8px 12px;font-size:13px">
                                 <span style="font-weight:600">{{ shift.name }}</span>
-                                <span style="color:#666;font-size:12px">{{ shift.start }}〜{{ shift.end }}</span>
+                                <span style="color:var(--nm-text-dim);font-size:12px">{{ shift.start }}〜{{ shift.end }}</span>
                             </div>
                             {% endfor %}
                         </div>
                         {% else %}
-                        <span style="color:#bbb;font-size:13px">シフトなし</span>
+                        <span style="color:var(--nm-text-dim);font-size:13px">シフトなし</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -71,7 +71,7 @@
 {% endfor %}
 
 {% if not store_shifts %}
-<div class="card" style="text-align:center;color:#999;padding:40px">
+<div class="card" style="text-align:center;color:var(--nm-text-dim);padding:40px">
     店舗が登録されていません
 </div>
 {% endif %}

@@ -25,11 +25,11 @@
         <span>〜</span>
         <input type="date" name="date_to" value="{{ filter_to }}" placeholder="終了日">
         <button class="btn btn-primary">検索</button>
-        <a href="/logs" class="btn" style="background:#95a5a6;color:white">リセット</a>
+        <a href="/logs" class="btn">リセット</a>
     </form>
     {% if is_unapplied and unapplied_list %}
-    <div style="margin-bottom:16px;padding:12px;background:#fff3e0;border:1px solid #ffcc80;border-radius:6px">
-        <h3 style="margin:0 0 8px;font-size:14px;color:#e65100">未申請者 ({{ unapplied_list[0].date }}) — {{ unapplied_list|length }}名</h3>
+    <div class="nm-surface" style="margin-bottom:16px;padding:12px;border-radius:14px">
+        <h3 style="margin:0 0 8px;font-size:14px;color:#b3651b">未申請者 ({{ unapplied_list[0].date }}) — {{ unapplied_list|length }}名</h3>
         <table style="width:100%">
             <thead><tr><th style="width:80px">社員番号</th><th>氏名</th></tr></thead>
             <tbody>
@@ -40,12 +40,12 @@
         </table>
     </div>
     {% elif is_unapplied %}
-    <div style="margin-bottom:16px;padding:12px;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:6px;font-size:14px;color:#2e7d32">
+    <div class="nm-surface" style="margin-bottom:16px;padding:12px;border-radius:14px;font-size:14px;color:#2e7d4c">
         未申請者はいません
     </div>
     {% endif %}
     <div style="margin-bottom:12px;text-align:right">
-        <button class="btn" style="background:#e74c3c;color:white" onclick="document.getElementById('resetModal').style.display='block'">通知リセット</button>
+        <button class="btn" style="background:#e0637c;color:white;box-shadow:-4px -4px 8px rgba(255,255,255,.4),4px 4px 8px rgba(190,60,90,.5)" onclick="document.getElementById('resetModal').style.display='block'">通知リセット</button>
     </div>
     <div class="table-wrap">
     <table>
@@ -62,7 +62,7 @@
             </tr>
             {% endfor %}
             {% if not logs %}
-            <tr><td colspan="4" style="text-align:center;color:#999">ログがありません</td></tr>
+            <tr><td colspan="4" style="text-align:center;color:var(--nm-text-dim)">ログがありません</td></tr>
             {% endif %}
         </tbody>
     </table>
@@ -78,17 +78,18 @@
 @media (max-width: 600px) {
     .table-wrap table thead { display: none; }
     .table-wrap table, .table-wrap table tbody, .table-wrap table tr, .table-wrap table td { display: block; width: 100%; }
-    .table-wrap table tr { border: 1px solid #ddd; border-radius: 6px; margin-bottom: 12px; padding: 10px 12px; background: #fff; }
-    .table-wrap table td { border-bottom: none; padding: 4px 0; font-size: 14px; }
-    .table-wrap table td::before { content: attr(data-label) ": "; font-weight: 600; color: #555; }
-    .table-wrap table td[data-label="メッセージ"] { margin-top: 4px; padding-top: 8px; border-top: 1px solid #eee; white-space: pre-wrap; word-break: break-word; }
+    .table-wrap table tr { border-radius: 14px; margin-bottom: 12px; padding: 10px 12px; background: var(--nm-bg);
+                           box-shadow: -4px -4px 8px var(--nm-shadow-light), 4px 4px 8px var(--nm-shadow-dark); }
+    .table-wrap table td { padding: 4px 0; font-size: 14px; }
+    .table-wrap table td::before { content: attr(data-label) ": "; font-weight: 600; color: var(--nm-text-dim); }
+    .table-wrap table td[data-label="メッセージ"] { margin-top: 4px; padding-top: 8px; box-shadow: inset 0 1px 0 rgba(163,177,198,.3); white-space: pre-wrap; word-break: break-word; }
     .table-wrap table td[data-label="メッセージ"]::before { display: block; margin-bottom: 4px; }
 }
 </style>
 
 <!-- Reset Modal -->
 <div id="resetModal" class="modal-bg" style="display:none" onclick="if(event.target===this)this.style.display='none'">
-    <div style="background:white;border-radius:8px;padding:24px;max-width:400px;margin:80px auto;box-shadow:0 4px 24px rgba(0,0,0,0.2)">
+    <div class="modal" style="max-width:400px">
         <h3 style="margin:0 0 16px;font-size:16px">通知履歴リセット</h3>
         <form method="POST" action="/logs/reset" id="resetForm" onsubmit="return confirmReset()">
             <div style="margin-bottom:12px">

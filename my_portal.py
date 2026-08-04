@@ -285,12 +285,18 @@ def schedule():
     prev_month = (first_day - timedelta(days=1)).strftime('%Y-%m')
     next_month = (last_day + timedelta(days=1)).strftime('%Y-%m')
 
+    staff_options = [
+        {'email': s['lw_account_id'], 'displayName': s['display_name'], 'dept': f"{s['company']} / {s['dept']}"}
+        for s in _get_staff_list() if s.get('lw_account_id') and s['staff_id'] != staff['staff_id']
+    ]
+
     return render_template(
         'my_schedule.html', staff=staff, today=today_str,
         weekday_ja=weekday_ja_sun, weeks=weeks,
         names_by_date=names_by_date, my_events_by_date=my_events_by_date,
         month_label=f'{year}年{month}月', current_month=f'{year:04d}-{month:02d}',
         prev_month=prev_month, next_month=next_month,
+        staff_options_json=json.dumps(staff_options, ensure_ascii=False),
         calendar_data_json=json.dumps({
             'names': names_by_date,
             'myEvents': my_events_by_date,

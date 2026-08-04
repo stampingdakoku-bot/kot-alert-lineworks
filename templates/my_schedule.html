@@ -84,7 +84,7 @@
                         <option value="monthly">毎月</option>
                     </select>
                 </div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 4px 0">
+                <div id="repeatDaysWrap" style="display:none;gap:10px;flex-wrap:wrap;margin:4px 0 4px 0">
                     {% for code, label in [('MO','月'),('TU','火'),('WE','水'),('TH','木'),('FR','金'),('SA','土'),('SU','日')] %}
                     <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
                         <input type="checkbox" name="repeat_days" value="{{ code }}" class="repeatDayCheck" style="min-height:auto;width:16px;height:16px">{{ label }}
@@ -92,6 +92,23 @@
                     {% endfor %}
                 </div>
             </div>
+
+            {# ===== 参加メンバー ===== #}
+            <div class="form-row" style="align-items:flex-start">
+                <label>参加メンバー</label>
+                <div style="flex:1;position:relative">
+                    <input type="text" id="attendeeSearch" placeholder="名前/部署等で検索してください" autocomplete="off" style="width:100%">
+                    <div id="attendeeSuggest" class="card" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;max-height:220px;overflow-y:auto;padding:6px"></div>
+                    <div id="attendeeChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+                </div>
+            </div>
+            <input type="hidden" name="attendees" id="f_attendees" value="[]">
+
+            {# ===== 通知(リマインダー) ===== #}
+            <div id="reminderRows" style="margin-top:4px"></div>
+            <button type="button" class="btn" style="padding:6px 14px;font-size:13px;margin-top:4px" onclick="addReminderRow()">＋ 通知を追加</button>
+            <input type="hidden" name="reminders" id="f_reminders" value="[]">
+
             <div style="margin-top:12px;display:flex;gap:8px">
                 <button type="submit" class="btn btn-success">登録する</button>
                 <button type="button" id="f_cancel_edit" class="btn" style="display:none" onclick="resetForm()">新規作成に戻る</button>
@@ -128,9 +145,17 @@
 <script>
 var CAL_DATA = {{ calendar_data_json|safe }};
 var MY_NAME = {{ staff.display_name|tojson }};
+var MY_EMAIL = {{ (staff.lw_account_id or '')|tojson }};
+var STAFF_OPTIONS = {{ staff_options_json|safe }};
 var currentDate = null;
 var currentDayEvents = [];
 var pendingDeleteEvent = null;
+var currentAttendees = [];
+var currentReminders = [];
+var REMINDER_OPTIONS = [
+    ['-PT5M', '5分前'], ['-PT10M', '10分前'], ['-PT15M', '15分前'],
+    ['-PT30M', '30分前'], ['-PT60M', '1時間前'], ['-P1D', '1日前']
+];
 
 function escapeHtml(s) {
     var div = document.createElement('div');
@@ -191,6 +216,93 @@ function closeDayModal() {
     document.getElementById('dayModalBg').style.display = 'none';
 }
 
+function syncAttendeesField() { document.getElementById('f_attendees').value = JSON.stringify(currentAttendees); }
+
+function renderAttendeeChips() {
+    var wrap = document.getElementById('attendeeChips');
+    wrap.innerHTML = currentAttendees.map(function(a, i) {
+        return '<span class="nm-surface" style="padding:4px 10px;border-radius:12px;font-size:12px;display:inline-flex;align-items:center;gap:6px">' +
+            escapeHtml(a.displayName) +
+            '<button type="button" onclick="removeAttendee(' + i + ')" style="border:none;background:none;cursor:pointer;color:var(--nm-text-dim);font-size:14px;line-height:1;padding:0">×</button></span>';
+    }).join('');
+}
+
+function addAttendee(opt) {
+    if (currentAttendees.some(function(a) { return a.email === opt.email; })) return;
+    currentAttendees.push({ email: opt.email, displayName: opt.displayName });
+    renderAttendeeChips();
+    syncAttendeesField();
+}
+
+function removeAttendee(i) {
+    currentAttendees.splice(i, 1);
+    renderAttendeeChips();
+    syncAttendeesField();
+}
+
+function setupAttendeeSearch() {
+    var input = document.getElementById('attendeeSearch');
+    var suggest = document.getElementById('attendeeSuggest');
+    if (!input) return;
+    input.addEventListener('input', function() {
+        var q = this.value.trim();
+        if (!q) { suggest.style.display = 'none'; suggest.innerHTML = ''; return; }
+        var matches = STAFF_OPTIONS.filter(function(o) {
+            return (o.displayName && o.displayName.indexOf(q) !== -1) || (o.dept && o.dept.indexOf(q) !== -1);
+        }).slice(0, 20);
+        if (!matches.length) { suggest.style.display = 'none'; suggest.innerHTML = ''; return; }
+        suggest.innerHTML = matches.map(function(o, i) {
+            return '<div class="attendeeOption" data-idx="' + i + '" style="padding:8px 10px;cursor:pointer;border-radius:8px;font-size:13px">' +
+                escapeHtml(o.displayName) + ' <span style="color:var(--nm-text-dim);font-size:11px">' + escapeHtml(o.dept) + '</span></div>';
+        }).join('');
+        suggest.style.display = 'block';
+        suggest.querySelectorAll('.attendeeOption').forEach(function(el) {
+            el.addEventListener('click', function() {
+                addAttendee(matches[parseInt(el.dataset.idx, 10)]);
+                input.value = '';
+                suggest.style.display = 'none';
+                suggest.innerHTML = '';
+            });
+        });
+    });
+    document.addEventListener('click', function(e) {
+        if (e.target !== input && !suggest.contains(e.target)) suggest.style.display = 'none';
+    });
+}
+
+function syncRemindersField() { document.getElementById('f_reminders').value = JSON.stringify(currentReminders); }
+
+function renderReminderRows() {
+    var wrap = document.getElementById('reminderRows');
+    wrap.innerHTML = currentReminders.map(function(trigger, i) {
+        var options = REMINDER_OPTIONS.map(function(o) {
+            return '<option value="' + o[0] + '"' + (o[0] === trigger ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('');
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+            '<span style="font-size:16px">🔔</span>' +
+            '<select onchange="updateReminderAt(' + i + ', this.value)" style="min-width:120px">' + options + '</select>' +
+            '<button type="button" class="btn" style="padding:6px 10px" onclick="removeReminderRow(' + i + ')">✕</button>' +
+            '</div>';
+    }).join('');
+}
+
+function addReminderRow() {
+    currentReminders.push('-PT10M');
+    renderReminderRows();
+    syncRemindersField();
+}
+
+function updateReminderAt(i, value) {
+    currentReminders[i] = value;
+    syncRemindersField();
+}
+
+function removeReminderRow(i) {
+    currentReminders.splice(i, 1);
+    renderReminderRows();
+    syncRemindersField();
+}
+
 function resetForm() {
     document.getElementById('formModeLabel').textContent = '予定を登録';
     document.getElementById('eventForm').reset();
@@ -199,11 +311,20 @@ function resetForm() {
     document.getElementById('f_date_display').value = currentDate;
     document.getElementById('f_recurrence').value = '[]';
     document.getElementById('repeatSection').style.display = '';
+    document.getElementById('repeatDaysWrap').style.display = 'none';
     document.getElementById('f_cancel_edit').style.display = 'none';
     document.getElementById('f_start').readOnly = false;
     document.getElementById('f_end').readOnly = false;
     document.getElementById('recurringEditNote').style.display = 'none';
     document.getElementById('eventForm').querySelector('button[type=submit]').textContent = '登録する';
+    currentAttendees = [];
+    renderAttendeeChips();
+    syncAttendeesField();
+    currentReminders = [];
+    renderReminderRows();
+    syncRemindersField();
+    var searchInput = document.getElementById('attendeeSearch');
+    if (searchInput) searchInput.value = '';
 }
 
 function editEventAt(idx) {
@@ -224,6 +345,15 @@ function editEventAt(idx) {
     document.getElementById('f_end').readOnly = ev.is_recurring;
     document.getElementById('recurringEditNote').style.display = ev.is_recurring ? 'block' : 'none';
     document.getElementById('eventForm').querySelector('button[type=submit]').textContent = '更新する';
+
+    currentAttendees = (ev.attendees || [])
+        .filter(function(a) { return a.email !== MY_EMAIL; })
+        .map(function(a) { return { email: a.email, displayName: a.displayName || a.email }; });
+    renderAttendeeChips();
+    syncAttendeesField();
+    currentReminders = (ev.reminders || []).map(function(r) { return r.trigger; }).filter(Boolean);
+    renderReminderRows();
+    syncRemindersField();
 }
 
 function askDeleteAt(idx) {
@@ -257,6 +387,14 @@ function submitDelete(mode) {
 function closeDeleteChoice() {
     document.getElementById('deleteChoiceBg').style.display = 'none';
     pendingDeleteEvent = null;
+}
+
+setupAttendeeSearch();
+var repeatFreqSelect = document.getElementById('f_repeat_freq');
+if (repeatFreqSelect) {
+    repeatFreqSelect.addEventListener('change', function() {
+        document.getElementById('repeatDaysWrap').style.display = this.value ? 'flex' : 'none';
+    });
 }
 </script>
 {% endblock %}

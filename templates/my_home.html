@@ -8,30 +8,31 @@
 {% endif %}
 </style>
 <div class="card">
-    <h2>{{ staff.display_name }} さん（{{ staff.company }} / {{ staff.dept }}）</h2>
+    <h2 style="text-align:center">{{ staff.display_name }} さん（{{ staff.company }} / {{ staff.dept }}）</h2>
 
-    <div style="margin-top:16px">
+    <div style="margin-top:16px;text-align:center">
         <div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">勤怠</div>
         {% if staff.kot_employee_key %}
         <p style="margin-bottom:12px">
-            本日の出勤: <strong>{{ clock_in[11:16] if clock_in else '未打刻' }}</strong>
+            本日の出勤: <strong>{{ clock_in[11:16] if clock_in else '未打刻' }}</strong><br>
             本日の退勤: <strong>{{ clock_out[11:16] if clock_out else '未打刻' }}</strong>
         </p>
         {% if not clock_in %}
-        <p style="color:var(--nm-text);font-size:14px;margin-bottom:12px">おはようございます。本日もよろしくお願いします。</p>
+        <p style="color:var(--nm-text);font-size:14px;margin-bottom:16px;line-height:1.7">おはようございます。<br>本日もよろしくお願いします。</p>
         {% elif clock_out %}
-        <p style="color:var(--nm-text);font-size:14px;margin-bottom:12px">
-            本日もお疲れ様でした。{% if next_shift_date %}次回は{{ next_shift_date }}{% else %}次回{% endif %}もよろしくお願いします。
+        <p style="color:var(--nm-text);font-size:14px;margin-bottom:16px;line-height:1.7">
+            本日もお疲れ様でした。{% if next_shift_date %}次回は{{ next_shift_date }}です。{% else %}次回もよろしくお願いします。{% endif %}
+            {% if next_shift_date %}<br>よろしくお願いします。{% endif %}
         </p>
         {% endif %}
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center">
             <form method="POST" action="{{ url_for('my.punch') }}" onsubmit="return confirm('出勤打刻を記録します。よろしいですか？');">
                 <input type="hidden" name="code" value="1">
-                <button type="submit" class="btn btn-success">出勤</button>
+                <button type="submit" class="btn btn-success" style="padding:18px 36px;font-size:16px;min-height:56px">出勤</button>
             </form>
             <form method="POST" action="{{ url_for('my.punch') }}" onsubmit="return confirm('退勤打刻を記録します。よろしいですか？');">
                 <input type="hidden" name="code" value="2">
-                <button type="submit" class="btn btn-danger">退勤</button>
+                <button type="submit" class="btn btn-danger" style="padding:18px 36px;font-size:16px;min-height:56px">退勤</button>
             </form>
         </div>
         {% else %}

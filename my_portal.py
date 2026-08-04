@@ -137,16 +137,17 @@ def _today_records(staff):
 
 
 def _next_shift_date(staff):
-    """次回の出勤予定日(月/日表記)を返す。NeeSaテナントはシフトカレンダーから
+    """次回の出勤予定日(月/日(曜)表記)を返す。NeeSaテナントはシフトカレンダーから
     算出、本体テナントは同等の簡易照会が未実装のためNoneを返す。"""
     if staff.get('kot_tenant') != 'neesa':
         return None
     tomorrow = (datetime.now(JST) + timedelta(days=1)).date()
     names_by_date = neesa_lw.get_names_by_date_range(tomorrow, tomorrow + timedelta(days=30))
+    weekday_ja = ['月', '火', '水', '木', '金', '土', '日']
     for d in sorted(names_by_date):
         if staff['display_name'] in names_by_date[d]:
             d_obj = datetime.strptime(d, '%Y-%m-%d')
-            return f'{d_obj.month}/{d_obj.day}'
+            return f'{d_obj.month}月{d_obj.day}日（{weekday_ja[d_obj.weekday()]}）'
     return None
 
 

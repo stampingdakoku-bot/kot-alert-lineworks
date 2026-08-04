@@ -237,6 +237,9 @@ def schedule():
 def set_color():
     color = (request.form.get('bg_color') or '').strip()
     if color:
-        supabase.table('staff_directory').update({'bg_color': color}) \
-            .eq('staff_id', session['staff_id']).execute()
+        try:
+            supabase.table('staff_directory').update({'bg_color': color}) \
+                .eq('staff_id', session['staff_id']).execute()
+        except Exception:
+            flash('背景色の保存に失敗しました（準備中です）', 'error')
     return redirect(url_for('my.home'))

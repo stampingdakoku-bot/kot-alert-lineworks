@@ -809,8 +809,55 @@ def shifts():
             'days': days,
         })
 
+    # ===== NeeSa/アソビバ本社/ディアメント 各部署タブ(表示するかはユーザーが選択) =====
+    import neesa_lw
+    all_neesa_keys = sorted(
+        set(neesa_lw.DEPT_MAP.values()) | set(neesa_lw.ALWAYS_SHOW),
+        key=lambda kv: (
+            neesa_lw.COMPANY_ORDER.index(kv[0]) if kv[0] in neesa_lw.COMPANY_ORDER else 99,
+            neesa_lw.DEPT_ORDER.index(kv[1]) if kv[1] in neesa_lw.DEPT_ORDER else 99,
+        )
+    )
+    is_neesa_active = active_store in [f'{c}|{d}' for c, d in all_neesa_keys]
+
+    neesa_by_key = {key: {d.isoformat(): [] for d in dates} for key in all_neesa_keys}
+    if is_neesa_active:
+        # アクティブなタブがNeeSa側の時のみ実際にカレンダーを取得
+        for d in dates:
+            for g in neesa_lw.get_today_shifts(d):
+                key = (g['company'], g['dept'])
+                if key in neesa_by_key:
+                    neesa_by_key[key][d.isoformat()] = sorted(g['shifts'], key=lambda x: x.get('start') or '')
+
+    neesa_shifts = []
+    for company, dept in all_neesa_keys:
+        days = []
+        for d in dates:
+            d_str = d.isoformat()
+            days.append({
+                'date': d_str,
+                'weekday': ['月', '火', '水', '木', '金', '土', '日'][d.weekday()],
+                'is_today': d == today,
+                'shifts': neesa_by_key[(company, dept)][d_str],
+            })
+        neesa_shifts.append({
+            'company': company,
+            'dept': dept,
+            'tab_key': f'{company}|{dept}',
+            'days': days,
+        })
+
+    # タブバー表示用に会社ごとへグルーピング(順序はCOMPANY_ORDER/DEPT_ORDER準拠)
+    neesa_companies = []
+    for entry in neesa_shifts:
+        if not neesa_companies or neesa_companies[-1]['company'] != entry['company']:
+            neesa_companies.append({'company': entry['company'], 'groups': []})
+        neesa_companies[-1]['groups'].append(entry)
+
     return render_template('shifts.html',
                            store_shifts=store_shifts,
+                           neesa_shifts=neesa_shifts,
+                           neesa_companies=neesa_companies,
                            active_store=active_store,
                            today=today_str)
 

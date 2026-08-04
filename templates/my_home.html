@@ -77,34 +77,56 @@
     </div>
 
     <div style="margin-top:24px">
-        <div style="font-size:14px;color:var(--nm-text-dim);text-align:center;margin-bottom:16px">カラースタイルを選択してください</div>
-        <form method="POST" action="{{ url_for('my.set_color') }}" id="colorForm">
-        <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:420px;margin:0 auto">
-            {% for top, bottom in [
-                ('#000080', '#F5F5DC'), ('#4e1319', '#b2f3e9'), ('#28633d', '#da98c1'),
-                ('#c7bfd2', '#363c2e'), ('#383838', '#c06c22'), ('#d4e7f3', '#2d1405')
-            ] %}
-            {% set val = top ~ '|' ~ bottom %}
-            <label style="cursor:pointer">
-                <input type="radio" name="bg_color" value="{{ val }}" style="display:none"
-                       {{ 'checked' if staff.bg_color == val }}
-                       onchange="this.form.requestSubmit()">
-                <div style="width:60px;height:60px;border-radius:10px;overflow:hidden;position:relative;
-                            {{ 'outline:3px solid var(--nm-accent);outline-offset:3px' if staff.bg_color == val }}">
-                    <div style="height:50%;background:{{ top }}"></div>
-                    <div style="height:50%;background:{{ bottom }}"></div>
-                    {% if staff.bg_color == val %}
-                    <span style="position:absolute;bottom:-2px;right:-2px;background:var(--nm-accent);color:white;
-                                  border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;
-                                  text-align:center">✓</span>
-                    {% endif %}
-                </div>
-            </label>
-            {% endfor %}
+        <div id="designToggle" style="cursor:pointer;font-size:14px;font-weight:bold;color:var(--nm-text);display:flex;align-items:center;gap:6px">
+            <span id="designArrow">▶</span> デザイン変更
         </div>
-        </form>
+        <div id="designPanel" style="display:none;margin-top:16px">
+            <div style="font-size:14px;color:var(--nm-text-dim);text-align:center;margin-bottom:16px">カラースタイルを選択してください</div>
+            <form method="POST" action="{{ url_for('my.set_color') }}" id="colorForm">
+            <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:420px;margin:0 auto">
+                {% for top, bottom in [
+                    ('#000080', '#F5F5DC'), ('#4e1319', '#b2f3e9'), ('#28633d', '#da98c1'),
+                    ('#c7bfd2', '#363c2e'), ('#383838', '#c06c22'), ('#d4e7f3', '#2d1405')
+                ] %}
+                {% set val = top ~ '|' ~ bottom %}
+                <label style="cursor:pointer">
+                    <input type="radio" name="bg_color" value="{{ val }}" style="display:none"
+                           {{ 'checked' if staff.bg_color == val }}
+                           onchange="this.form.requestSubmit()">
+                    <div style="width:60px;height:60px;border-radius:10px;overflow:hidden;position:relative;
+                                {{ 'outline:3px solid var(--nm-accent);outline-offset:3px' if staff.bg_color == val }}">
+                        <div style="height:50%;background:{{ top }}"></div>
+                        <div style="height:50%;background:{{ bottom }}"></div>
+                        {% if staff.bg_color == val %}
+                        <span style="position:absolute;bottom:-2px;right:-2px;background:var(--nm-accent);color:white;
+                                      border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;
+                                      text-align:center">✓</span>
+                        {% endif %}
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+            </form>
+        </div>
     </div>
 
     <a href="{{ url_for('my.logout') }}" class="btn" style="margin-top:16px">ログアウト（別の人に切り替え）</a>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var toggle = document.getElementById('designToggle');
+    var panel = document.getElementById('designPanel');
+    var arrow = document.getElementById('designArrow');
+    if (toggle) {
+        toggle.addEventListener('click', function() {
+            var open = panel.style.display !== 'none';
+            panel.style.display = open ? 'none' : 'block';
+            arrow.textContent = open ? '▶' : '▼';
+        });
+    }
+})();
+</script>
 {% endblock %}

@@ -8,40 +8,14 @@
 {% endif %}
 .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
 .cal-cell { aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-            border-radius:10px; text-decoration:none; color:var(--nm-text); font-size:13px; position:relative;
-            transition: box-shadow .12s ease; }
+            border-radius:10px; text-decoration:none; color:var(--nm-text); font-size:15px; position:relative;
+            transition: box-shadow .12s ease; background:none; border:none; font-family:inherit; cursor:pointer; width:100%; }
 .cal-cell:hover { box-shadow: -3px -3px 6px var(--nm-shadow-light), 3px 3px 6px var(--nm-shadow-dark); }
 .cal-cell.today { color:var(--nm-accent); font-weight:bold; }
-.cal-cell.selected { font-weight:bold; color:var(--nm-accent); outline:2px solid var(--nm-accent); outline-offset:-2px;
-                      box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
-.cal-dot { width:5px; height:5px; border-radius:50%; background:#3fb987; margin-top:2px; }
+.cal-dots { display:flex; gap:3px; margin-top:3px; }
+.cal-dot { width:5px; height:5px; border-radius:50%; background:#3fb987; }
+.cal-dot-mine { width:5px; height:5px; border-radius:50%; background:var(--nm-accent); }
 </style>
-<div class="card">
-    <h2>予定を登録（{{ staff.display_name }} さん）</h2>
-    <form method="POST">
-        <div class="form-row">
-            <label>内容</label>
-            <input type="text" name="title" placeholder="例: 外出" required style="flex:1">
-        </div>
-        <div class="form-row">
-            <label>日付</label>
-            <input type="date" name="date" value="{{ today }}" required>
-        </div>
-        <div class="form-row">
-            <label>開始時刻</label>
-            <input type="time" name="start_time" required>
-        </div>
-        <div class="form-row">
-            <label>終了時刻</label>
-            <input type="time" name="end_time" required>
-        </div>
-        <button type="submit" class="btn btn-success">登録する</button>
-        <a href="{{ url_for('my.home') }}" class="btn">戻る</a>
-    </form>
-    <p style="color:var(--nm-text-dim);font-size:12px;margin-top:16px">
-        ※ 「合同会社NeeSa」カレンダーに登録され、Work Logにも反映されます。
-    </p>
-</div>
 
 <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -59,30 +33,219 @@
         {% for d in week %}
         {% if d %}
         {% set d_iso = d.isoformat() %}
-        <a href="?month={{ current_month }}&date={{ d_iso }}"
-           class="cal-cell{% if d_iso == today %} today{% endif %}{% if d_iso == selected_date %} selected{% endif %}">
+        <button type="button" onclick="openDayModal('{{ d_iso }}')"
+           class="cal-cell{% if d_iso == today %} today{% endif %}">
             {{ d.day }}
-            {% if names_by_date.get(d_iso) %}<span class="cal-dot"></span>{% endif %}
-        </a>
+            <span class="cal-dots">
+                {% if names_by_date.get(d_iso) %}<span class="cal-dot"></span>{% endif %}
+                {% if my_events_by_date.get(d_iso) %}<span class="cal-dot-mine"></span>{% endif %}
+            </span>
+        </button>
         {% else %}
         <div></div>
         {% endif %}
         {% endfor %}
     </div>
     {% endfor %}
-
-    <div style="margin-top:20px;padding-top:16px;box-shadow:inset 0 1px 0 rgba(163,177,198,.3)">
-        <h2 style="font-size:15px">{{ selected_date }} の出勤予定</h2>
-        {% if selected_names %}
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
-            {% for name in selected_names %}
-            <span style="background:var(--nm-bg);color:var(--nm-text);padding:4px 12px;border-radius:12px;font-size:13px;
-                         box-shadow:-3px -3px 6px var(--nm-shadow-light),3px 3px 6px var(--nm-shadow-dark)">{{ name }}</span>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p style="color:var(--nm-text-dim);font-size:13px;margin-top:8px">この日の出勤予定はありません</p>
-        {% endif %}
+    <div style="display:flex;gap:16px;margin-top:16px;font-size:12px;color:var(--nm-text-dim)">
+        <span><span class="cal-dot" style="display:inline-block;margin-right:4px"></span>他の人の出勤予定</span>
+        <span><span class="cal-dot-mine" style="display:inline-block;margin-right:4px"></span>あなたの予定</span>
     </div>
 </div>
+
+{# ===== 日付タップで開く予定ポップアップ(Googleカレンダー風) ===== #}
+<div id="dayModalBg" class="modal-bg" onclick="if(event.target===this) closeDayModal()">
+    <div class="modal" style="max-width:480px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <h3 id="dayModalTitle" style="margin:0"></h3>
+            <button type="button" class="btn" style="padding:6px 12px" onclick="closeDayModal()">✕</button>
+        </div>
+
+        <div id="dayWorkingList"></div>
+        <div id="myEventsList"></div>
+
+        <div id="formModeLabel" style="font-weight:bold;margin:8px 0">予定を登録</div>
+        <form id="eventForm" method="POST" action="{{ url_for('my.schedule') }}">
+            <input type="hidden" name="date" id="f_date">
+            <input type="hidden" name="recurrence" id="f_recurrence" value="[]">
+            <div class="form-row"><label>日付</label><input type="text" id="f_date_display" disabled style="flex:1"></div>
+            <div class="form-row"><label>内容</label><input type="text" name="title" id="f_title" placeholder="例: 外出" required style="flex:1"></div>
+            <div class="form-row"><label>開始時刻</label><input type="time" name="start_time" id="f_start" required></div>
+            <div class="form-row"><label>終了時刻</label><input type="time" name="end_time" id="f_end" required></div>
+            <div id="repeatSection">
+                <div class="form-row">
+                    <label>繰り返し</label>
+                    <select name="repeat_freq" id="f_repeat_freq" style="min-width:140px">
+                        <option value="">繰り返しなし</option>
+                        <option value="weekly">毎週</option>
+                        <option value="monthly">毎月</option>
+                    </select>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 4px 0">
+                    {% for code, label in [('MO','月'),('TU','火'),('WE','水'),('TH','木'),('FR','金'),('SA','土'),('SU','日')] %}
+                    <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+                        <input type="checkbox" name="repeat_days" value="{{ code }}" class="repeatDayCheck" style="min-height:auto;width:16px;height:16px">{{ label }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px">
+                <button type="submit" class="btn btn-success">登録する</button>
+                <button type="button" id="f_cancel_edit" class="btn" style="display:none" onclick="resetForm()">新規作成に戻る</button>
+            </div>
+        </form>
+        <p style="color:var(--nm-text-dim);font-size:12px;margin-top:16px">
+            ※ 「合同会社NeeSa」カレンダーに登録され、Work Logにも反映されます。
+        </p>
+    </div>
+</div>
+
+{# ===== 繰り返し予定の削除方法選択 ===== #}
+<div id="deleteChoiceBg" class="modal-bg" onclick="if(event.target===this) closeDeleteChoice()">
+    <div class="modal" style="max-width:360px">
+        <h3 style="margin-bottom:16px">繰り返し予定の削除</h3>
+        <div style="display:flex;flex-direction:column;gap:8px">
+            <button type="button" class="btn" onclick="submitDelete('single')">この予定だけ削除する</button>
+            <button type="button" class="btn" onclick="submitDelete('following')">この日以降の繰り返し予定も削除する</button>
+            <button type="button" class="btn" style="margin-top:8px" onclick="closeDeleteChoice()">キャンセル</button>
+        </div>
+    </div>
+</div>
+<form id="deleteForm" method="POST" style="display:none">
+    <input type="hidden" name="mode" id="del_mode">
+    <input type="hidden" name="occurrence_date" id="del_occurrence_date">
+    <input type="hidden" name="series_start" id="del_series_start">
+    <input type="hidden" name="series_end" id="del_series_end">
+    <input type="hidden" name="summary" id="del_summary">
+    <input type="hidden" name="recurrence" id="del_recurrence">
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var CAL_DATA = {{ calendar_data_json|safe }};
+var MY_NAME = {{ staff.display_name|tojson }};
+var currentDate = null;
+var currentDayEvents = [];
+var pendingDeleteEvent = null;
+
+function escapeHtml(s) {
+    var div = document.createElement('div');
+    div.textContent = s == null ? '' : String(s);
+    return div.innerHTML;
+}
+
+function eventTitle(summary) {
+    var s = (summary || '').replace(/^\d{1,2}:\d{2}-\d{1,2}:\d{2}/, '');
+    if (s.indexOf(MY_NAME) === 0) s = s.slice(MY_NAME.length);
+    return s.trim();
+}
+
+function formatDateLabel(iso) {
+    var d = new Date(iso + 'T00:00:00');
+    var w = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日(' + w + ')の予定';
+}
+
+function openDayModal(iso) {
+    currentDate = iso;
+    document.getElementById('dayModalTitle').textContent = formatDateLabel(iso);
+
+    var names = CAL_DATA.names[iso] || [];
+    var workingHtml = '';
+    if (names.length) {
+        workingHtml = '<div style="font-size:12px;color:var(--nm-text-dim);margin-bottom:6px">この日の出勤予定</div>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">' +
+            names.map(function(n) {
+                return '<span class="nm-surface" style="padding:4px 10px;border-radius:12px;font-size:12px">' + escapeHtml(n) + '</span>';
+            }).join('') + '</div>';
+    }
+    document.getElementById('dayWorkingList').innerHTML = workingHtml;
+
+    var myEvents = CAL_DATA.myEvents[iso] || [];
+    currentDayEvents = myEvents;
+    var myHtml = '';
+    if (myEvents.length) {
+        myHtml = '<div style="font-size:12px;color:var(--nm-text-dim);margin-bottom:6px">あなたの予定</div>';
+        myEvents.forEach(function(ev, idx) {
+            myHtml += '<div class="nm-surface" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:12px;margin-bottom:8px;gap:8px">' +
+                '<div><div style="font-weight:600;font-size:13px">' + escapeHtml(eventTitle(ev.summary)) +
+                (ev.is_recurring ? ' <span style="font-size:11px;color:var(--nm-text-dim)">(繰り返し)</span>' : '') + '</div>' +
+                '<div style="font-size:12px;color:var(--nm-text-dim)">' + ev.start_time + '〜' + ev.end_time + '</div></div>' +
+                '<div style="display:flex;gap:6px;flex-shrink:0">' +
+                '<button type="button" class="btn" style="padding:6px 10px" onclick="editEventAt(' + idx + ')">✏️</button>' +
+                '<button type="button" class="btn" style="padding:6px 10px" onclick="askDeleteAt(' + idx + ')">🗑</button>' +
+                '</div></div>';
+        });
+    }
+    document.getElementById('myEventsList').innerHTML = myHtml;
+
+    resetForm();
+    document.getElementById('dayModalBg').style.display = 'block';
+}
+
+function closeDayModal() {
+    document.getElementById('dayModalBg').style.display = 'none';
+}
+
+function resetForm() {
+    document.getElementById('formModeLabel').textContent = '予定を登録';
+    document.getElementById('eventForm').reset();
+    document.getElementById('eventForm').action = '{{ url_for("my.schedule") }}';
+    document.getElementById('f_date').value = currentDate;
+    document.getElementById('f_date_display').value = currentDate;
+    document.getElementById('f_recurrence').value = '[]';
+    document.getElementById('repeatSection').style.display = '';
+    document.getElementById('f_cancel_edit').style.display = 'none';
+    document.getElementById('eventForm').querySelector('button[type=submit]').textContent = '登録する';
+}
+
+function editEventAt(idx) {
+    var ev = currentDayEvents[idx];
+    document.getElementById('formModeLabel').textContent = '予定を編集';
+    document.getElementById('eventForm').action = '/my/schedule/event/' + ev.event_id + '/edit';
+    document.getElementById('f_date').value = currentDate;
+    document.getElementById('f_date_display').value = currentDate;
+    document.getElementById('f_title').value = eventTitle(ev.summary);
+    document.getElementById('f_start').value = ev.start_time;
+    document.getElementById('f_end').value = ev.end_time;
+    document.getElementById('f_recurrence').value = JSON.stringify(ev.recurrence || []);
+    document.getElementById('repeatSection').style.display = 'none';
+    document.getElementById('f_cancel_edit').style.display = 'inline-block';
+    document.getElementById('eventForm').querySelector('button[type=submit]').textContent = '更新する';
+}
+
+function askDeleteAt(idx) {
+    var ev = currentDayEvents[idx];
+    if (!ev.is_recurring) {
+        if (!confirm('この予定を削除します。よろしいですか？')) return;
+        fillDeleteForm(ev, 'all');
+        document.getElementById('deleteForm').submit();
+        return;
+    }
+    pendingDeleteEvent = ev;
+    document.getElementById('deleteChoiceBg').style.display = 'block';
+}
+
+function fillDeleteForm(ev, mode) {
+    document.getElementById('del_mode').value = mode;
+    document.getElementById('del_occurrence_date').value = ev.occurrence_date;
+    document.getElementById('del_series_start').value = ev.series_start;
+    document.getElementById('del_series_end').value = ev.series_end;
+    document.getElementById('del_summary').value = ev.summary;
+    document.getElementById('del_recurrence').value = JSON.stringify(ev.recurrence || []);
+    document.getElementById('deleteForm').action = '/my/schedule/event/' + ev.event_id + '/delete';
+}
+
+function submitDelete(mode) {
+    if (!pendingDeleteEvent) return;
+    fillDeleteForm(pendingDeleteEvent, mode);
+    document.getElementById('deleteForm').submit();
+}
+
+function closeDeleteChoice() {
+    document.getElementById('deleteChoiceBg').style.display = 'none';
+    pendingDeleteEvent = null;
+}
+</script>
 {% endblock %}

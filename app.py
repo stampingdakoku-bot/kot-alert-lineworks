@@ -350,6 +350,7 @@ def _get_store_shifts_and_attendance(today_str):
 @app.route('/')
 def dashboard():
     today_actual = date.today().isoformat()
+    max_future_date = (date.today() + timedelta(days=7))
     date_param = (request.args.get('date') or '').strip()
     try:
         if date_param:
@@ -358,12 +359,14 @@ def dashboard():
             selected = date.today()
     except ValueError:
         selected = date.today()
-    # 未来日は今日に丸める
-    if selected > date.today():
-        selected = date.today()
+    # 翌日以降のシフト確認のため、最大7日先までは表示可能にする
+    if selected > max_future_date:
+        selected = max_future_date
+    max_future_date = max_future_date.isoformat()
     today = selected.isoformat()
     is_past = today < today_actual
     is_today = today == today_actual
+    is_future = today > today_actual
     prev_date = (selected - timedelta(days=1)).isoformat()
     next_date = (selected + timedelta(days=1)).isoformat()
 
@@ -373,6 +376,15 @@ def dashboard():
         .eq('alert_date', today) \
         .order('created_at', desc=True) \
         .execute()
+
+    # インフォメーション設定(マーキー)
+    marquee_text = ''
+    try:
+        settings_row = supabase.table('alert_settings').select('dashboard_marquee_text').eq('id', 1).execute()
+        if settings_row.data:
+            marquee_text = settings_row.data[0].get('dashboard_marquee_text') or ''
+    except Exception:
+        marquee_text = ''
 
     # Summary by flow_type
     summary = {}
@@ -408,6 +420,21 @@ def dashboard():
         except Exception as e:
             app.logger.warning('dashboard NeeSaカード取得失敗: %s', e)
             neesa_groups = []
+
+    # ===== リアルタイム出勤状況(本体/NeeSa両テナント統合。/my/overviewと同じロジックを無認証で公開) =====
+    unified_grouped = {}
+    unified_group_list = []
+    if is_today:
+        try:
+            import attendance_unified
+            for st in attendance_unified.get_unified_status():
+                key = f"{st['company']}|{st['dept']}"
+                unified_grouped.setdefault(key, []).append(st)
+            unified_group_list = [(key, key.replace('|', ' / ')) for key in unified_grouped.keys()]
+        except Exception as e:
+            app.logger.warning('リアルタイム出勤状況取得失敗: %s', e)
+            unified_grouped = {}
+            unified_group_list = []
 
     # Unmapped staff count (exclude is_excluded=true)
     unmapped = [e for e in all_emp_data
@@ -466,8 +493,13 @@ def dashboard():
     return render_template('dashboard.html',
                            today=today,
                            today_actual=today_actual,
+                           max_future_date=max_future_date,
+                           marquee_text=marquee_text,
+                           unified_grouped=unified_grouped,
+                           unified_group_list=unified_group_list,
                            is_past=is_past,
                            is_today=is_today,
+                           is_future=is_future,
                            prev_date=prev_date,
                            next_date=next_date,
                            alert_history=alert_history,
@@ -920,6 +952,7 @@ def settings():
         _db.save_alert_templates(templates)
 
         updates = {
+            'dashboard_marquee_text': request.form.get('dashboard_marquee_text', '').strip(),
             'clockin_alarm_enabled': 'clockin_alarm_enabled' in request.form,
             'late_clockin_enabled': 'late_clockin_enabled' in request.form,
             'late_clockin_start_minutes': int(request.form.get('late_clockin_start_minutes', 10)),
@@ -943,8 +976,14 @@ def settings():
             'morning_check_minute': int(request.form.get('morning_check_minute', 10)),
             'updated_at': datetime.now(JST).isoformat(),
         }
-        supabase.table('alert_settings').update(updates).eq('id', 1).execute()
-        flash('設定を保存しました', 'success')
+        try:
+            supabase.table('alert_settings').update(updates).eq('id', 1).execute()
+            flash('設定を保存しました', 'success')
+        except Exception:
+            # dashboard_marquee_text列が未作成の場合はそれを除いて再試行
+            updates.pop('dashboard_marquee_text', None)
+            supabase.table('alert_settings').update(updates).eq('id', 1).execute()
+            flash('設定を保存しました（インフォメーション設定はDB未対応のため保存されていません）', 'error')
         return redirect(url_for('settings'))
 
     try:

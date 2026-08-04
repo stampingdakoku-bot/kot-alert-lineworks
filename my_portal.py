@@ -9,6 +9,7 @@ SSOが解決次第、login()の中身だけをAuthlib実装に差し替える想
 既存の管理画面(/, /board, /staff等)はこれまで通り無認証のまま・無変更。
 """
 import functools
+import json
 import calendar as _calendar_mod
 from datetime import datetime, date, timezone, timedelta
 
@@ -195,22 +196,28 @@ def schedule():
         date_str = request.form.get('date')
         start_time = request.form.get('start_time')
         end_time = request.form.get('end_time')
+        repeat_freq = request.form.get('repeat_freq') or ''
+        repeat_days = request.form.getlist('repeat_days')
+        month_ctx = date_str[:7] if date_str else None
         if not (title and date_str and start_time and end_time):
             flash('全項目を入力してください', 'error')
-            return redirect(url_for('my.schedule'))
+            return redirect(url_for('my.schedule', month=month_ctx))
         try:
             start_dt = datetime.strptime(f'{date_str} {start_time}', '%Y-%m-%d %H:%M')
             end_dt = datetime.strptime(f'{date_str} {end_time}', '%Y-%m-%d %H:%M')
         except ValueError:
             flash('日付・時刻の形式が正しくありません', 'error')
-            return redirect(url_for('my.schedule'))
+            return redirect(url_for('my.schedule', month=month_ctx))
         summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
-        ok, detail = lw_calendar_write.create_event(summary, start_dt, end_dt)
+        recurrence = None
+        if repeat_freq in ('weekly', 'monthly') and repeat_days:
+            recurrence = [lw_calendar_write.build_rrule(repeat_freq, repeat_days)]
+        ok, detail = lw_calendar_write.create_event(summary, start_dt, end_dt, recurrence=recurrence)
         if ok:
             flash('予定を登録しました', 'success')
         else:
             flash('予定の登録に失敗しました', 'error')
-        return redirect(url_for('my.schedule'))
+        return redirect(url_for('my.schedule', month=month_ctx))
 
     now = datetime.now(JST)
     today_str = now.strftime('%Y-%m-%d')
@@ -226,6 +233,7 @@ def schedule():
     first_day = date(year, month, 1)
     last_day = date(year, month, _calendar_mod.monthrange(year, month)[1])
     names_by_date = neesa_lw.get_names_by_date_range(first_day, last_day)
+    my_events_by_date = lw_calendar_write.get_my_events(staff['display_name'], first_day, last_day)
 
     weekday_ja_sun = ['日', '月', '火', '水', '木', '金', '土']
     start_offset = (first_day.weekday() + 1) % 7  # 月曜=0 → 日曜=0起点に変換
@@ -241,19 +249,96 @@ def schedule():
     if week:
         weeks.append(week + [None] * (7 - len(week)))
 
-    selected_date = request.args.get('date') or today_str
-    selected_names = names_by_date.get(selected_date, [])
-
     prev_month = (first_day - timedelta(days=1)).strftime('%Y-%m')
     next_month = (last_day + timedelta(days=1)).strftime('%Y-%m')
 
     return render_template(
         'my_schedule.html', staff=staff, today=today_str,
-        weekday_ja=weekday_ja_sun, weeks=weeks, names_by_date=names_by_date,
+        weekday_ja=weekday_ja_sun, weeks=weeks,
+        names_by_date=names_by_date, my_events_by_date=my_events_by_date,
         month_label=f'{year}年{month}月', current_month=f'{year:04d}-{month:02d}',
         prev_month=prev_month, next_month=next_month,
-        selected_date=selected_date, selected_names=selected_names,
+        calendar_data_json=json.dumps({
+            'names': names_by_date,
+            'myEvents': my_events_by_date,
+        }, ensure_ascii=False),
     )
+
+
+@my_bp.route('/schedule/event/<event_id>/edit', methods=['POST'])
+@require_staff_login
+def schedule_edit(event_id):
+    staff = _get_staff(session['staff_id'])
+    title = (request.form.get('title') or '').strip()
+    date_str = request.form.get('date')
+    start_time = request.form.get('start_time')
+    end_time = request.form.get('end_time')
+    recurrence_json = request.form.get('recurrence') or '[]'
+    month_ctx = date_str[:7] if date_str else None
+
+    if not (title and date_str and start_time and end_time):
+        flash('全項目を入力してください', 'error')
+        return redirect(url_for('my.schedule', month=month_ctx))
+    try:
+        start_dt = datetime.strptime(f'{date_str} {start_time}', '%Y-%m-%d %H:%M')
+        end_dt = datetime.strptime(f'{date_str} {end_time}', '%Y-%m-%d %H:%M')
+    except ValueError:
+        flash('日付・時刻の形式が正しくありません', 'error')
+        return redirect(url_for('my.schedule', month=month_ctx))
+    try:
+        recurrence = json.loads(recurrence_json)
+    except (ValueError, TypeError):
+        recurrence = []
+
+    summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
+    ok, detail = lw_calendar_write.update_event(event_id, summary, start_dt, end_dt, recurrence=recurrence or None)
+    if ok:
+        flash('予定を更新しました', 'success')
+    else:
+        flash('予定の更新に失敗しました', 'error')
+    return redirect(url_for('my.schedule', month=month_ctx))
+
+
+@my_bp.route('/schedule/event/<event_id>/delete', methods=['POST'])
+@require_staff_login
+def schedule_delete(event_id):
+    mode = request.form.get('mode', 'all')  # 'all' | 'single' | 'following'
+    occurrence_date_str = request.form.get('occurrence_date') or ''
+    series_start_str = request.form.get('series_start') or ''
+    series_end_str = request.form.get('series_end') or ''
+    summary = request.form.get('summary') or ''
+    recurrence_json = request.form.get('recurrence') or '[]'
+    month_ctx = (occurrence_date_str or series_start_str)[:7] or None
+
+    try:
+        recurrence = json.loads(recurrence_json)
+    except (ValueError, TypeError):
+        recurrence = []
+
+    if mode == 'all' or not recurrence:
+        ok, detail = lw_calendar_write.delete_event(event_id)
+    else:
+        try:
+            series_start = datetime.fromisoformat(series_start_str)
+            series_end = datetime.fromisoformat(series_end_str)
+            occ_date = date.fromisoformat(occurrence_date_str)
+        except (ValueError, TypeError):
+            flash('削除処理に失敗しました', 'error')
+            return redirect(url_for('my.schedule', month=month_ctx))
+
+        if mode == 'single':
+            occ_dt = datetime.combine(occ_date, series_start.time())
+            new_recurrence = lw_calendar_write.exclude_occurrence(recurrence, occ_dt)
+        else:  # following
+            new_recurrence = lw_calendar_write.truncate_recurrence_before(recurrence, occ_date)
+        ok, detail = lw_calendar_write.update_event(
+            event_id, summary, series_start, series_end, recurrence=new_recurrence)
+
+    if ok:
+        flash('予定を削除しました', 'success')
+    else:
+        flash('予定の削除に失敗しました', 'error')
+    return redirect(url_for('my.schedule', month=month_ctx))
 
 
 @my_bp.route('/color', methods=['POST'])

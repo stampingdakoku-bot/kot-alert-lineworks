@@ -29,18 +29,29 @@
 </div>
 {% endif %}
 
+{% if marquee_text %}
+<div class="marquee-wrap">
+    <div class="marquee-track">
+        <span class="marquee-item">📢 {{ marquee_text }}</span>
+        <span class="marquee-item">📢 {{ marquee_text }}</span>
+    </div>
+</div>
+{% endif %}
+
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <h2 style="margin:0">本日の出勤状況</h2>
         <span id="liveClock" style="font-size:14px;color:var(--nm-text-dim);font-variant-numeric:tabular-nums"></span>
         {% if is_past %}
         <span style="background:#f39c12;color:white;font-size:11px;padding:3px 8px;border-radius:10px">過去データ表示中</span>
+        {% elif is_future %}
+        <span style="background:var(--nm-accent);color:white;font-size:11px;padding:3px 8px;border-radius:10px">翌日以降のシフト表示中（打刻情報はまだありません）</span>
         {% endif %}
     </div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <a href="?date={{ prev_date }}" class="nm-surface" style="padding:6px 12px;color:var(--nm-text);text-decoration:none;border-radius:12px;font-size:13px">◀ 前日</a>
-        <input type="date" id="dateNav" value="{{ today }}" max="{{ today_actual }}" style="padding:5px 8px;font-size:13px">
-        {% if is_today %}
+        <input type="date" id="dateNav" value="{{ today }}" max="{{ max_future_date }}" style="padding:5px 8px;font-size:13px">
+        {% if next_date > max_future_date %}
         <span class="nm-inset" style="padding:6px 12px;color:var(--nm-text-dim);border-radius:12px;font-size:13px;cursor:not-allowed">翌日 ▶</span>
         {% else %}
         <a href="?date={{ next_date }}" class="nm-surface" style="padding:6px 12px;color:var(--nm-text);text-decoration:none;border-radius:12px;font-size:13px">翌日 ▶</a>
@@ -48,6 +59,59 @@
         <span id="lastUpdate" style="font-size:12px;color:var(--nm-text-dim);margin-left:8px"></span>
     </div>
 </div>
+
+{# ===== タブ切り替え(リアルタイム / シフト予定) ===== #}
+<div style="display:flex;gap:8px;margin-bottom:16px">
+    <button type="button" class="btn tab-btn" data-tab="realtime" onclick="switchDashTab('realtime')">リアルタイム</button>
+    <button type="button" class="btn tab-btn" data-tab="shift" onclick="switchDashTab('shift')">シフト予定</button>
+</div>
+
+<div id="tabpane-realtime">
+    {# ===== リアルタイム表示カスタマイズ(ブラウザ単位・localStorage) ===== #}
+    <div class="card" style="padding:12px 16px;margin-bottom:16px">
+        <div id="rtCustomizeToggle" style="cursor:pointer;font-size:14px;font-weight:bold;color:var(--nm-text);display:flex;align-items:center;gap:6px">
+            <span id="rtCustomizeArrow">▶</span> 表示する部署をカスタマイズ
+        </div>
+        <div id="rtCustomizePanel" style="display:none;margin-top:12px;flex-wrap:wrap;gap:6px 16px">
+            {% for key, label in unified_group_list %}
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-right:12px">
+                <input type="checkbox" class="rtCheck" data-rtgroup="{{ key }}" checked style="min-height:auto;width:16px;height:16px">
+                {{ label }}
+            </label>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="store-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        {% for key, label in unified_group_list %}
+        <div class="card" data-rtgroup="{{ key }}">
+            <h2 style="font-size:18px">{{ label }}</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:12px">
+                {% for m in unified_grouped[key] %}
+                <div class="person-card-rt">
+                    <span class="person-dot-rt {{ 'live' if m.status == 'working' }}"></span>
+                    <div style="font-size:14px;font-weight:600">{{ m.display_name }}</div>
+                    <div style="font-size:12px;color:var(--nm-text-dim)">{{ m.dept }}</div>
+                    <div style="font-size:12px;margin-top:4px">
+                        {% if m.status == 'working' %}<span style="color:#27ae60">出勤中 {{ m.clock_in[11:16] if m.clock_in }}</span>
+                        {% elif m.status == 'done' %}<span style="color:#3498db">退勤済</span>
+                        {% elif m.status == 'unknown' %}<span style="color:var(--nm-text-dim)">—</span>
+                        {% else %}<span style="color:#e74c3c">未打刻</span>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+        {% if not unified_group_list %}
+        <div class="card" style="grid-column:1/-1;text-align:center;color:var(--nm-text-dim);padding:40px">
+            {% if is_today %}リアルタイムデータを取得できませんでした{% else %}リアルタイム表示は本日のみ利用できます{% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div id="tabpane-shift" style="display:none">
 
 {# ===== 表示カスタマイズ(ブラウザ単位で記憶・localStorage) ===== #}
 <div class="card" style="padding:12px 16px;margin-bottom:16px">
@@ -256,7 +320,18 @@
     </div>
 </div>
 
+</div>
+{# ↑ tabpane-shift終わり #}
+
 <style>
+.tab-btn.active { box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); color: var(--nm-accent); }
+
+@keyframes blink-green-rt { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.person-card-rt { position:relative; border-radius:12px; padding:12px 12px 12px 28px; min-width:160px;
+               background: var(--nm-bg); box-shadow: -5px -5px 10px var(--nm-shadow-light), 5px 5px 10px var(--nm-shadow-dark); }
+.person-dot-rt { position:absolute; top:14px; left:12px; width:10px; height:10px; border-radius:50%; background: var(--nm-text-dim); }
+.person-dot-rt.live { background:#3fb987; animation:blink-green-rt 1.2s infinite; }
+
 .avatar-group { display: inline-flex; align-items: center; }
 .avatar {
     width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
@@ -266,6 +341,26 @@
 }
 .avatar + .avatar { margin-left: -8px; }
 .avatar-overflow { background: var(--nm-text-dim) !important; color: var(--nm-bg); font-size: 10px; }
+
+.marquee-wrap {
+    position: relative; overflow: hidden; border-radius: var(--nm-radius); margin-bottom: 16px; padding: 12px 0;
+    background: var(--nm-bg); box-shadow: -6px -6px 12px var(--nm-shadow-light), 6px 6px 12px var(--nm-shadow-dark);
+}
+.marquee-track { display: flex; width: max-content; animation: marquee-scroll 22s linear infinite; }
+.marquee-wrap:hover .marquee-track { animation-play-state: paused; }
+.marquee-item { padding: 0 48px; white-space: nowrap; font-size: 14px; font-weight: 600; color: var(--nm-text); }
+.marquee-wrap::before, .marquee-wrap::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 56px; z-index: 2; pointer-events: none;
+}
+.marquee-wrap::before { left: 0; background: linear-gradient(to right, var(--nm-bg), transparent); }
+.marquee-wrap::after { right: 0; background: linear-gradient(to left, var(--nm-bg), transparent); }
+@keyframes marquee-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .marquee-track { animation: none; }
+}
 
 @media (max-width: 768px) {
     .store-grid { grid-template-columns: 1fr !important; }
@@ -350,6 +445,54 @@
             arrow.textContent = open ? '▶' : '▼';
         });
     }
+
+    // リアルタイムタブの表示カスタマイズ(ブラウザ単位・localStorageで記憶)
+    var RT_STORAGE_KEY = 'dashboardRealtimeHiddenGroups';
+    var rtHidden = [];
+    try { rtHidden = JSON.parse(localStorage.getItem(RT_STORAGE_KEY) || '[]'); } catch (e) { rtHidden = []; }
+
+    function applyRtVisibility() {
+        document.querySelectorAll('.rtCheck').forEach(function(cb) {
+            var visible = rtHidden.indexOf(cb.dataset.rtgroup) === -1;
+            cb.checked = visible;
+            var card = document.querySelector('.card[data-rtgroup="' + CSS.escape(cb.dataset.rtgroup) + '"]');
+            if (card) card.style.display = visible ? '' : 'none';
+        });
+    }
+    document.querySelectorAll('.rtCheck').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            var group = this.dataset.rtgroup;
+            if (this.checked) {
+                rtHidden = rtHidden.filter(function(g) { return g !== group; });
+            } else if (rtHidden.indexOf(group) === -1) {
+                rtHidden.push(group);
+            }
+            localStorage.setItem(RT_STORAGE_KEY, JSON.stringify(rtHidden));
+            applyRtVisibility();
+        });
+    });
+    applyRtVisibility();
+
+    var rtToggle = document.getElementById('rtCustomizeToggle');
+    var rtPanel = document.getElementById('rtCustomizePanel');
+    var rtArrow = document.getElementById('rtCustomizeArrow');
+    if (rtToggle) {
+        rtToggle.addEventListener('click', function() {
+            var open = rtPanel.style.display !== 'none' && rtPanel.style.display !== '';
+            rtPanel.style.display = open ? 'none' : 'flex';
+            rtArrow.textContent = open ? '▶' : '▼';
+        });
+    }
+
+    // タブ切り替え(常にリアルタイムをデフォルト表示)
+    window.switchDashTab = function(name) {
+        document.getElementById('tabpane-realtime').style.display = name === 'realtime' ? '' : 'none';
+        document.getElementById('tabpane-shift').style.display = name === 'shift' ? '' : 'none';
+        document.querySelectorAll('.tab-btn').forEach(function(b) {
+            b.classList.toggle('active', b.dataset.tab === name);
+        });
+    };
+    switchDashTab('realtime');
 })();
 </script>
 

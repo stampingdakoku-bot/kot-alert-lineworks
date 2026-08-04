@@ -3,8 +3,11 @@ LINE WORKSカレンダーへの予定作成。既存neesa_lw.pyの読み取り�
 (JWT)を流用し、書き込み時のみ scope=calendar のトークンを別途取得する
 (scope=calendar.readのトークンでは書き込み不可、Phase 0スパイクで検証済み)。
 """
+import re
 import time
 import logging
+from datetime import datetime, timedelta, timezone
+
 import requests
 import jwt
 
@@ -39,8 +42,8 @@ def _get_write_token():
     return resp.json()["access_token"]
 
 
-def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None):
-    """予定を作成する。戻り値: (success: bool, detail)"""
+def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None, recurrence=None):
+    """予定を作成する。recurrence指定時は繰り返し予定として登録。戻り値: (success: bool, detail)"""
     calendar_id = calendar_id or DEFAULT_CALENDAR_ID
     user_id = user_id or neesa_lw.DEFAULT_USER
     try:
@@ -50,13 +53,14 @@ def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None):
         return False, str(e)
 
     url = f"{neesa_lw.API_BASE}/users/{user_id}/calendars/{calendar_id}/events"
-    body = {
-        "eventComponents": [{
-            "summary": summary,
-            "start": {"dateTime": start_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
-            "end": {"dateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
-        }]
+    comp = {
+        "summary": summary,
+        "start": {"dateTime": start_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
+        "end": {"dateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
     }
+    if recurrence:
+        comp["recurrence"] = recurrence
+    body = {"eventComponents": [comp]}
     try:
         resp = requests.post(
             url, headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
@@ -69,6 +73,200 @@ def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None):
     except Exception as e:
         logger.error("予定作成エラー: %s", e)
         return False, str(e)
+
+
+def _events_url(event_id, calendar_id, user_id):
+    calendar_id = calendar_id or DEFAULT_CALENDAR_ID
+    user_id = user_id or neesa_lw.DEFAULT_USER
+    return f"{neesa_lw.API_BASE}/users/{user_id}/calendars/{calendar_id}/events/{event_id}"
+
+
+def update_event(event_id, summary, start_dt, end_dt, recurrence=None, calendar_id=None, user_id=None):
+    """予定を更新する(全体入れ替え)。戻り値: (success: bool, detail)"""
+    try:
+        token = _get_write_token()
+    except Exception as e:
+        logger.error("カレンダー書き込みトークン取得失敗: %s", e)
+        return False, str(e)
+
+    comp = {
+        "summary": summary,
+        "start": {"dateTime": start_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
+        "end": {"dateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
+    }
+    if recurrence:
+        comp["recurrence"] = recurrence
+    body = {"eventComponents": [comp]}
+    try:
+        resp = requests.put(
+            _events_url(event_id, calendar_id, user_id),
+            headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+            json=body, timeout=30,
+        )
+        if resp.status_code in (200, 204):
+            return True, (resp.json() if resp.text else {})
+        logger.warning("予定更新失敗 status=%s body=%s", resp.status_code, resp.text[:500])
+        return False, resp.text
+    except Exception as e:
+        logger.error("予定更新エラー: %s", e)
+        return False, str(e)
+
+
+def delete_event(event_id, calendar_id=None, user_id=None):
+    """予定(シリーズ全体)を削除する。単一occurrenceの削除はEXDATE追加(update_event)で行う。"""
+    try:
+        token = _get_write_token()
+    except Exception as e:
+        logger.error("カレンダー書き込みトークン取得失敗: %s", e)
+        return False, str(e)
+    try:
+        resp = requests.delete(
+            _events_url(event_id, calendar_id, user_id),
+            headers={"Authorization": "Bearer " + token}, timeout=30,
+        )
+        if resp.status_code in (200, 204):
+            return True, None
+        logger.warning("予定削除失敗 status=%s body=%s", resp.status_code, resp.text[:500])
+        return False, resp.text
+    except Exception as e:
+        logger.error("予定削除エラー: %s", e)
+        return False, str(e)
+
+
+def _get_events_raw(from_dt, until_dt, calendar_id=None, user_id=None):
+    """eventId・recurrenceを保持したまま取得(編集・削除用。neesa_lw.get_calendar_eventsは
+    eventIdを捨てて平坦化するため、こちらは専用に実装して既存関数には触れない)。"""
+    calendar_id = calendar_id or DEFAULT_CALENDAR_ID
+    user_id = user_id or neesa_lw.DEFAULT_USER
+    token = neesa_lw.get_access_token()
+    if not token:
+        return []
+    url = f"{neesa_lw.API_BASE}/users/{user_id}/calendars/{calendar_id}/events"
+    headers = {"Authorization": "Bearer " + token}
+    params = {"fromDateTime": from_dt, "untilDateTime": until_dt}
+    try:
+        r = requests.get(url, headers=headers, params=params, timeout=30)
+        r.raise_for_status()
+        return r.json().get("events", [])
+    except Exception as e:
+        logger.error("イベント取得失敗: %s", e)
+        return []
+
+
+def get_my_events(display_name, start_date, end_date, calendar_id=None, user_id=None):
+    """summaryにdisplay_nameを含む予定をeventId付きで返す(本人の予定の閲覧・編集・削除用)。
+    戻り値: {date_iso: [{event_id, summary, start_time, end_time, recurrence}, ...]}"""
+    base = datetime(start_date.year, start_date.month, start_date.day, tzinfo=neesa_lw.JST)
+    frm = base.isoformat()
+    unt = (datetime(end_date.year, end_date.month, end_date.day, tzinfo=neesa_lw.JST) + timedelta(days=1)).isoformat()
+    raw_events = _get_events_raw(frm, unt, calendar_id, user_id)
+
+    result = {}
+    d = start_date
+    while d <= end_date:
+        result[d.isoformat()] = []
+        d += timedelta(days=1)
+
+    for e in raw_events:
+        event_id = e.get("eventId")
+        for comp in e.get("eventComponents", []):
+            summary = comp.get("summary", "")
+            if display_name not in summary:
+                continue
+            start = comp.get("start", {})
+            sdt = start.get("dateTime")
+            if not sdt:
+                continue
+            end = comp.get("end", {})
+            edt = end.get("dateTime", "")
+            try:
+                dtstart = neesa_lw.isoparse(sdt).replace(tzinfo=None)
+                dtend = neesa_lw.isoparse(edt).replace(tzinfo=None) if edt else dtstart
+            except (ValueError, TypeError):
+                continue
+            recurrence = comp.get("recurrence") or []
+            d = start_date
+            while d <= end_date:
+                if neesa_lw._applies_on(comp, d):
+                    result[d.isoformat()].append({
+                        'event_id': event_id,
+                        'summary': summary,
+                        'start_time': f'{dtstart.hour:02d}:{dtstart.minute:02d}',
+                        'end_time': f'{dtend.hour:02d}:{dtend.minute:02d}',
+                        'is_recurring': bool(recurrence),
+                        'recurrence': recurrence,
+                        'occurrence_date': d.isoformat(),
+                        'series_start': dtstart.isoformat(),
+                        'series_end': dtend.isoformat(),
+                    })
+                d += timedelta(days=1)
+    return result
+
+
+def build_rrule(freq, weekdays):
+    """freq: 'weekly' | 'monthly', weekdays: ['MO','TU',...] のRRULE文字列を1本組み立てる"""
+    freq_code = 'WEEKLY' if freq == 'weekly' else 'MONTHLY'
+    byday = ','.join(weekdays)
+    return f"RRULE:FREQ={freq_code};BYDAY={byday}"
+
+
+def _rrule_with_until(rrule_line, until_dt_utc):
+    """既存のRRULE行のUNTILを置き換える(なければ追加)。until_dt_utcはtz-aware UTC datetime"""
+    until_str = until_dt_utc.strftime("%Y%m%dT%H%M%SZ")
+    parts = rrule_line[len("RRULE:"):].split(';')
+    parts = [p for p in parts if not p.startswith('UNTIL=')]
+    parts.append(f'UNTIL={until_str}')
+    return "RRULE:" + ";".join(parts)
+
+
+def truncate_recurrence_before(recurrence, occurrence_date):
+    """occurrence_date(この日)以降を除外するようRRULEにUNTILを設定した新しいrecurrenceを返す"""
+    cutoff_local = datetime(occurrence_date.year, occurrence_date.month, occurrence_date.day,
+                             0, 0, 0, tzinfo=neesa_lw.JST) - timedelta(seconds=1)
+    cutoff_utc = cutoff_local.astimezone(timezone.utc)
+    new_rec = []
+    for line in recurrence:
+        if line.startswith('RRULE:'):
+            new_rec.append(_rrule_with_until(line, cutoff_utc))
+        else:
+            new_rec.append(line)
+    return new_rec
+
+
+def exclude_occurrence(recurrence, occurrence_dt_local):
+    """occurrence_dt_local(該当occurrenceの開始日時, tz無し/JSTのnaive datetime)をEXDATEとして
+    recurrenceに追加した新しいrecurrenceを返す"""
+    exdate_str = occurrence_dt_local.strftime("%Y%m%dT%H%M%S")
+    new_rec = list(recurrence)
+    new_rec.append(f"EXDATE;TZID=Asia/Tokyo:{exdate_str}")
+    return new_rec
+
+
+def list_upcoming_events(days=14, calendar_id=None, user_id=None):
+    """今日から指定日数分の予定を、開始日時順に並べて返す(既存の読み取り専用
+    calendar.readトークンを使う neesa_lw.get_calendar_events を流用)。"""
+    calendar_id = calendar_id or DEFAULT_CALENDAR_ID
+    user_id = user_id or neesa_lw.DEFAULT_USER
+    base = datetime.now(neesa_lw.JST).replace(hour=0, minute=0, second=0, microsecond=0)
+    frm = base.isoformat()
+    unt = (base + timedelta(days=days)).isoformat()
+
+    events = neesa_lw.get_calendar_events(calendar_id, frm, unt, user_id=user_id)
+    out = []
+    for e in events:
+        start = e.get("start", {}) or {}
+        end = e.get("end", {}) or {}
+        dt = start.get("dateTime") or start.get("date")
+        if not dt:
+            continue
+        out.append({
+            "summary": e.get("summary", ""),
+            "start": start.get("dateTime") or start.get("date"),
+            "end": end.get("dateTime") or end.get("date"),
+            "all_day": "dateTime" not in start,
+        })
+    out.sort(key=lambda x: x["start"])
+    return out
 
 
 def list_upcoming_events(days=14, calendar_id=None, user_id=None):

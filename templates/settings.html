@@ -23,6 +23,16 @@
 
 <form method="POST" action="/settings">
 
+{# ===== インフォメーション設定 ===== #}
+<div class="card">
+    <h2>インフォメーション設定</h2>
+    <div style="font-size:12px;color:var(--nm-text-dim);margin-bottom:8px">
+        本日の出勤状況ページ上部に流れるお知らせです。空欄にすると非表示になります。
+    </div>
+    <input type="text" name="dashboard_marquee_text" value="{{ s.get('dashboard_marquee_text', '') }}"
+           placeholder="例: 毎月15日がシフト〆です。各自確認してください。" style="width:100%">
+</div>
+
 {# ===== 出勤アラート ===== #}
 <div class="card">
     <h2>出勤アラート</h2>

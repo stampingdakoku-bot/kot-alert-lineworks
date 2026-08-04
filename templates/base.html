@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}勤怠ボード{% endblock %}</title>
+    <title>{% block title %}Work Log{% endblock %}</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
 
     <style>
@@ -66,7 +66,7 @@
 </head>
 <body>
     <nav>
-        <a href="/" class="brand">勤怠ボード</a>
+        <a href="/" class="brand">Work Log</a>
         <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="メニュー">&#9776;</button>
         <div class="nav-links">
             <a href="/" {% if request.path == '/' %}class="active"{% endif %}>ダッシュボード</a>

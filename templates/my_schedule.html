@@ -24,30 +24,38 @@
         <a href="{{ url_for('my.home') }}" class="btn" style="background:#95a5a6;color:white">戻る</a>
     </form>
     <p style="color:#999;font-size:12px;margin-top:16px">
-        ※ 「合同会社NeeSa」カレンダーに登録され、勤怠ボードにも反映されます。
+        ※ 「合同会社NeeSa」カレンダーに登録され、Work Logにも反映されます。
     </p>
 </div>
 
 <div class="card">
     <h2>今後14日間の予定</h2>
-    {% if upcoming %}
-    <div class="table-wrap">
-    <table>
-        <tr><th>日時</th><th>内容</th></tr>
-        {% for e in upcoming %}
-        <tr>
-            <td style="white-space:nowrap">
-                {% if e.all_day %}{{ e.start }}
-                {% else %}{{ e.start[5:16].replace('-', '/').replace('T', ' ') }}
+    <div style="display:flex;flex-direction:column;gap:2px">
+    {% for day in days %}
+    {% if day.events or day.is_today %}
+    <div style="display:flex;border-top:1px solid #eee;padding:10px 0;gap:12px">
+        <div style="width:76px;flex-shrink:0;font-size:13px;{{ 'color:#3498db;font-weight:bold' if day.is_today else 'color:#666' }}">
+            {{ day.label }}
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+            {% if day.events %}
+            {% for e in day.events %}
+            <div style="background:#eaf4fc;border-left:4px solid #3498db;border-radius:4px;padding:6px 10px">
+                <div style="font-size:13px;font-weight:600;color:#2c3e50">{{ e.summary }}</div>
+                {% if not e.all_day %}
+                <div style="font-size:12px;color:#666">
+                    {{ e.start[11:16] }}{% if e.end %} - {{ e.end[11:16] }}{% endif %}
+                </div>
                 {% endif %}
-            </td>
-            <td>{{ e.summary }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div style="font-size:13px;color:#ccc">予定なし</div>
+            {% endif %}
+        </div>
     </div>
-    {% else %}
-    <p style="color:#999;font-size:14px">予定はありません</p>
     {% endif %}
+    {% endfor %}
+    </div>
 </div>
 {% endblock %}

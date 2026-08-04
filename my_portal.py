@@ -171,6 +171,21 @@ def schedule():
         return redirect(url_for('my.schedule'))
 
     upcoming = lw_calendar_write.list_upcoming_events()
-    return render_template('my_schedule.html', staff=staff,
-                           today=datetime.now(JST).strftime('%Y-%m-%d'),
-                           upcoming=upcoming)
+    weekday_ja = ['月', '火', '水', '木', '金', '土', '日']
+    by_date = {}
+    for e in upcoming:
+        d = e['start'][:10]
+        by_date.setdefault(d, []).append(e)
+    today_str = datetime.now(JST).strftime('%Y-%m-%d')
+    days = []
+    for i in range(14):
+        d = (datetime.now(JST) + timedelta(days=i)).strftime('%Y-%m-%d')
+        d_obj = datetime.strptime(d, '%Y-%m-%d')
+        days.append({
+            'date': d,
+            'label': f"{d_obj.month}/{d_obj.day}（{weekday_ja[d_obj.weekday()]}）",
+            'is_today': d == today_str,
+            'events': by_date.get(d, []),
+        })
+
+    return render_template('my_schedule.html', staff=staff, today=today_str, days=days)

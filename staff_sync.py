@@ -59,8 +59,14 @@ def sync_main_employees():
 
 def sync_neesa_staff():
     """NeeSa/ボード系(DEPT_MAP)スタッフをstaff_directoryへ同期。
-    氏名(姓)をNeeSa KoT社員と突き合わせ、KOT_FULLNAMEピンで同姓を解決。"""
+    氏名(姓)をNeeSa KoT社員と突き合わせ、KOT_FULLNAMEピンで同姓を解決。
+    KoT API制限時間帯(8:30-10:00, 17:30-18:30)等で取得に失敗した場合は、
+    既存のkot_employee_keyを消さず維持する(取得失敗のたびに紐付けが
+    リセットされる事故を防ぐ)。"""
     emps = neesa_kot.get_employees() or []
+    if not emps:
+        logger.warning("NeeSa KoT社員取得に失敗(空)。既存のkot_employee_keyを維持します")
+
     byln = {}
     for e in emps:
         ln = e.get("lastName", "")
@@ -70,6 +76,12 @@ def sync_neesa_staff():
             continue
         if ln not in byln:
             byln[ln] = e.get("key")
+
+    existing = {
+        r["display_name"]: r["kot_employee_key"]
+        for r in supabase.table("staff_directory").select("display_name,kot_employee_key")
+        .eq("kot_tenant", "neesa").execute().data
+    }
 
     rows = []
     for name, (company, dept) in neesa_lw.DEPT_MAP.items():
@@ -81,7 +93,7 @@ def sync_neesa_staff():
             "company": company,
             "dept": dept,
             "kot_tenant": "neesa",
-            "kot_employee_key": byln.get(name),
+            "kot_employee_key": byln.get(name) or existing.get(name),
             "lw_account_id": None,
             "is_active": True,
         })

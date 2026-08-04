@@ -44,6 +44,15 @@ def _parse_iso(s):
     s = re.sub(r'(\.\d+)', lambda m: (m.group(1)[:7].ljust(7, '0')), s)
     return datetime.fromisoformat(s)
 
+import zlib
+
+@app.template_filter('name_hue')
+def name_hue_filter(name):
+    """名前から決定論的に色相(0-359)を生成。アバターグループの色分けに使用"""
+    if not name:
+        return 210
+    return zlib.crc32(name.encode('utf-8')) % 360
+
 @app.template_filter('to_jst')
 def to_jst_filter(s):
     """UTC日時文字列をJST表示用に変換 (例: '03/20 16:00')"""

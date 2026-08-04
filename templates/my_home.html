@@ -51,6 +51,32 @@
     </div>
 
     <div style="margin-top:24px">
+        <div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">最近の通知</div>
+        {% if notifications %}
+        <div class="table-wrap" style="max-height:320px;overflow-y:auto">
+        <table>
+            <thead><tr><th style="width:100px">日時</th><th style="width:110px">種別</th><th>メッセージ</th></tr></thead>
+            <tbody>
+                {% for notif in notifications %}
+                <tr>
+                    <td style="white-space:nowrap;font-size:12px">{{ notif.created_at|to_jst }}</td>
+                    <td>
+                        {% set ft = notif.flow_type %}
+                        {% set is_warn = ft in ('late_clockin', 'overtime', 'deviation') %}
+                        <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white;white-space:nowrap">{{ flow_labels.get(ft, ft) }}</span>
+                    </td>
+                    <td style="white-space:pre-wrap;word-break:break-all;font-size:12px;color:var(--nm-text-dim)">{{ notif.message or '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p style="color:var(--nm-text-dim);font-size:13px">通知はまだありません</p>
+        {% endif %}
+    </div>
+
+    <div style="margin-top:24px">
         <div style="font-size:14px;color:var(--nm-text-dim);text-align:center;margin-bottom:16px">カラースタイルを選択してください</div>
         <form method="POST" action="{{ url_for('my.set_color') }}" id="colorForm">
         <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:14px;max-width:420px;margin:0 auto">

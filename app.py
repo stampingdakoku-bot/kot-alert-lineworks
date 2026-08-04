@@ -383,13 +383,6 @@ def dashboard():
         ft = a['flow_type']
         summary[ft] = summary.get(ft, 0) + 1
 
-    # Recent alerts (last 20)
-    recent = supabase.table('alerts_sent') \
-        .select('*, employees(last_name, first_name)') \
-        .order('created_at', desc=True) \
-        .limit(20) \
-        .execute()
-
     # Store cards with shift/attendance data
     try:
         store_cards, all_emp_data = _get_store_shifts_and_attendance(today)
@@ -480,7 +473,6 @@ def dashboard():
                            alert_history=alert_history,
                            summary=summary,
                            total_today=len(alerts_today.data),
-                           recent=recent.data,
                            unmapped_count=unmapped_count,
                            unmapped_names=unmapped[:5],
                            neesa_groups=neesa_groups,

@@ -230,58 +230,25 @@
 </div>
 {% endif %}
 
-{# ===== 通知サマリー + 最近の通知 ===== #}
-<div class="summary-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-
-    {# --- 左: 通知サマリー --- #}
-    <div class="card">
-        <h2>本日の通知サマリー</h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div class="nm-inset" style="border-radius:12px;padding:16px;text-align:center">
-                <div style="font-size:32px;font-weight:bold;color:var(--nm-accent)">{{ total_today }}</div>
-                <div style="font-size:12px;color:var(--nm-text-dim)">通知総数</div>
-            </div>
-            {% set active_types = ['clockin_alarm', 'clockout_alarm', 'late_clockin', 'overtime', 'deviation', 'request_reminder'] %}
-            {% for ft in active_types %}
-            {% set count = summary.get(ft, 0) %}
-            {% set is_problem = ft in ('late_clockin', 'overtime', 'deviation') and count > 0 %}
-            <div class="nm-inset" style="border-radius:12px;padding:12px;text-align:center">
-                <div style="font-size:24px;font-weight:bold;color:{{ '#e74c3c' if is_problem else 'var(--nm-text)' }}">{{ count }}</div>
-                <div style="font-size:11px;color:var(--nm-text-dim)">{{ flow_labels.get(ft, ft) }}</div>
-            </div>
-            {% endfor %}
+{# ===== 通知サマリー ===== #}
+<div class="card" style="margin-bottom:16px">
+    <h2>本日の通知サマリー</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px">
+        <div class="nm-inset" style="border-radius:12px;padding:16px;text-align:center">
+            <div style="font-size:32px;font-weight:bold;color:var(--nm-accent)">{{ total_today }}</div>
+            <div style="font-size:12px;color:var(--nm-text-dim)">通知総数</div>
         </div>
-    </div>
-
-    {# --- 右: 最近の通知 --- #}
-    <div class="card" style="max-height:400px;overflow-y:auto">
-        <h2>最近の通知</h2>
-        <div class="table-wrap">
-        <table>
-            <thead><tr><th style="width:80px">日時</th><th style="width:80px">スタッフ</th><th style="width:100px">種別</th><th>メッセージ</th></tr></thead>
-            <tbody>
-                {% for log in recent %}
-                <tr>
-                    <td style="white-space:nowrap;font-size:12px">{{ log.created_at|to_jst }}</td>
-                    <td style="font-size:13px">{{ log.employees.last_name if log.employees else '' }}</td>
-                    <td>
-                        {% set ft = log.flow_type %}
-                        {% set is_warn = ft in ('late_clockin', 'overtime', 'deviation') %}
-                        <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white;white-space:nowrap">{{ flow_labels.get(ft, ft) }}</span>
-                    </td>
-                    <td style="white-space:pre-wrap;word-break:break-all;font-size:12px;color:var(--nm-text-dim)">{{ log.message or '' }}</td>
-                </tr>
-                {% endfor %}
-                {% if not recent %}
-                <tr><td colspan="4" style="text-align:center;color:var(--nm-text-dim);padding:24px">通知はまだありません</td></tr>
-                {% endif %}
-            </tbody>
-        </table>
+        {% set active_types = ['clockin_alarm', 'clockout_alarm', 'late_clockin', 'overtime', 'deviation', 'request_reminder'] %}
+        {% for ft in active_types %}
+        {% set count = summary.get(ft, 0) %}
+        {% set is_problem = ft in ('late_clockin', 'overtime', 'deviation') and count > 0 %}
+        <div class="nm-inset" style="border-radius:12px;padding:12px;text-align:center">
+            <div style="font-size:24px;font-weight:bold;color:{{ '#e74c3c' if is_problem else 'var(--nm-text)' }}">{{ count }}</div>
+            <div style="font-size:11px;color:var(--nm-text-dim)">{{ flow_labels.get(ft, ft) }}</div>
         </div>
+        {% endfor %}
     </div>
 </div>
-
-
 
 <style>
 .avatar-group { display: inline-flex; align-items: center; }

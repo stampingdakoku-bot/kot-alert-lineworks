@@ -29,6 +29,27 @@ supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_SERVICE_
 
 my_bp = Blueprint('my', __name__, url_prefix='/my')
 
+FLOW_LABELS = {
+    'clockin_alarm': '出勤アラーム',
+    'clockout_alarm': '退勤アラーム',
+    'late_clockin': '出勤打刻なし',
+    'overtime': '超過警告',
+    'deviation': '乖離通知',
+    'request_reminder': '申請リマインド',
+    'morning_check': '翌朝チェック',
+}
+
+
+def _my_notifications(staff, limit=20):
+    """本人宛のアラート通知のみ取得(alerts_sentはトレコレ本体テナントのみ運用のため、
+    NeeSaテナントのスタッフでは常に空になる)"""
+    key = staff.get('kot_employee_key')
+    if not key:
+        return []
+    result = supabase.table('alerts_sent').select('*') \
+        .eq('employee_key', key).order('created_at', desc=True).limit(limit).execute()
+    return result.data
+
 
 def require_staff_login(view):
     @functools.wraps(view)
@@ -106,8 +127,10 @@ def home():
     staff = _get_staff(session['staff_id'])
     clock_in, clock_out = _today_records(staff)
     next_shift_date = _next_shift_date(staff) if clock_out else None
+    notifications = _my_notifications(staff)
     return render_template('my_home.html', staff=staff, clock_in=clock_in, clock_out=clock_out,
-                           next_shift_date=next_shift_date)
+                           next_shift_date=next_shift_date, notifications=notifications,
+                           flow_labels=FLOW_LABELS)
 
 
 @my_bp.route('/punch', methods=['POST'])

@@ -21,6 +21,19 @@ supabase = create_client(
 
 JST = timezone(timedelta(hours=9))
 
+
+@app.before_request
+def _sync_bg_color_session():
+    """マイメニューでログイン済みだがbg_colorをまだセッションに持たない
+    （機能追加前からのセッション等）場合、DBから読み込んで補完する"""
+    if session.get('staff_id') and 'bg_color' not in session:
+        try:
+            result = supabase.table('staff_directory').select('bg_color') \
+                .eq('staff_id', session['staff_id']).limit(1).execute()
+            session['bg_color'] = result.data[0].get('bg_color') if result.data else None
+        except Exception:
+            session['bg_color'] = None
+
 # 異体字正規化マップ（KoT登録名 → カレンダー表記）
 KANJI_VARIANTS = {
     '𠮷': '吉',  # 𠮷(土吉) → 吉

@@ -159,17 +159,17 @@
         {% if g.shifts %}
         <div class="table-wrap">
         <table style="margin-bottom:0">
-            <thead><tr><th>スタッフ</th><th>シフト</th><th>状態</th></tr></thead>
+            <thead><tr><th>スタッフ</th><th>状態</th><th>勤務時間帯</th></tr></thead>
             <tbody>
             {% for s in g.shifts %}
             <tr>
                 <td style="font-size:14px">{{ s.name }}{% if s.remote %} 🏠{% endif %}</td>
-                <td style="font-size:13px;color:#666;white-space:nowrap">{% if s.start %}{{ s.start }}-{{ s.end }}{% else %}—{% endif %}</td>
                 <td style="font-size:12px;white-space:nowrap">
                     {% if s.status == 'working' %}<span style="color:#27ae60">出勤中</span>
                     {% elif s.status == 'done' %}<span style="color:#3498db">退勤済</span>
                     {% else %}<span style="color:#95a5a6">予定</span>{% endif %}
                 </td>
+                <td style="font-size:13px;color:#666;white-space:nowrap">{% if s.start %}{{ s.start }}-{{ s.end }}{% else %}—{% endif %}</td>
             </tr>
             {% endfor %}
             </tbody>

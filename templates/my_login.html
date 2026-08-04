@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}個人メニュー ログイン{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>ログイン</h2>
+    <p style="color:#999;font-size:13px;margin-bottom:16px">
+        ご自身の名前を選んでください（暫定的な簡易ログインです）
+    </p>
+    {% for (company, dept), members in grouped.items() %}
+    <div style="margin-bottom:16px">
+        <div style="font-weight:bold;color:#2c3e50;margin-bottom:8px">{{ company }} / {{ dept }}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+            {% for m in members %}
+            <form method="POST" style="margin:0">
+                <input type="hidden" name="staff_id" value="{{ m.staff_id }}">
+                <button type="submit" class="btn btn-primary">{{ m.display_name }}</button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}スケジュール登録{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>予定を登録（{{ staff.display_name }} さん）</h2>
+    <form method="POST">
+        <div class="form-row">
+            <label>内容</label>
+            <input type="text" name="title" placeholder="例: 外出" required style="flex:1">
+        </div>
+        <div class="form-row">
+            <label>日付</label>
+            <input type="date" name="date" value="{{ today }}" required>
+        </div>
+        <div class="form-row">
+            <label>開始時刻</label>
+            <input type="time" name="start_time" required>
+        </div>
+        <div class="form-row">
+            <label>終了時刻</label>
+            <input type="time" name="end_time" required>
+        </div>
+        <button type="submit" class="btn btn-success">登録する</button>
+        <a href="{{ url_for('my.home') }}" class="btn" style="background:#95a5a6;color:white">戻る</a>
+    </form>
+    <p style="color:#999;font-size:12px;margin-top:16px">
+        ※ 「合同会社NeeSa」カレンダーに登録され、勤怠ボードにも反映されます。
+    </p>
+</div>
+{% endblock %}

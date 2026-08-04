@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}出勤状況一覧{% endblock %}
+{% block content %}
+<form method="POST">
+<div class="card">
+    <h2>社内全体の出勤状況</h2>
+    <p style="color:#999;font-size:13px;margin-bottom:8px">チェックした人は一覧から非表示にできます</p>
+    {% for (company, dept), members in grouped.items() %}
+    <div style="margin-bottom:16px">
+        <div style="font-weight:bold;color:#2c3e50;margin-bottom:8px">{{ company }} / {{ dept }}</div>
+        <div class="table-wrap">
+        <table>
+            <tr><th>非表示</th><th>氏名</th><th>状態</th><th>出勤</th><th>退勤</th></tr>
+            {% for m in members %}
+            <tr{% if m.display_name in hidden_set %} style="opacity:0.4"{% endif %}>
+                <td><input type="checkbox" name="hide" value="{{ m.display_name }}"
+                    {{ 'checked' if m.display_name in hidden_set }}
+                    style="min-height:auto;width:18px;height:18px"></td>
+                <td>{{ m.display_name }}</td>
+                <td>
+                    {% if m.status == 'working' %}<span style="color:#27ae60">出勤中</span>
+                    {% elif m.status == 'done' %}<span style="color:#3498db">退勤済</span>
+                    {% elif m.status == 'unknown' %}<span style="color:#999">—</span>
+                    {% else %}<span style="color:#e74c3c">未打刻</span>{% endif %}
+                </td>
+                <td>{{ m.clock_in[11:16] if m.clock_in else '—' }}</td>
+                <td>{{ m.clock_out[11:16] if m.clock_out else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        </div>
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-success">表示設定を保存</button>
+    <a href="{{ url_for('my.home') }}" class="btn" style="background:#95a5a6;color:white">戻る</a>
+</div>
+</form>
+{% endblock %}

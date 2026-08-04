@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}個人メニュー{% endblock %}
+{% block content %}
+<div class="card">
+    <h2>{{ staff.display_name }} さん（{{ staff.company }} / {{ staff.dept }}）</h2>
+    <div class="stats" style="margin-top:16px">
+        <a href="{{ url_for('my.punch') }}" class="stat" style="text-decoration:none;color:inherit">
+            <div class="num">⏱</div>
+            <div class="label">勤怠ボタン</div>
+        </a>
+        <a href="{{ url_for('my.overview') }}" class="stat" style="text-decoration:none;color:inherit">
+            <div class="num">👥</div>
+            <div class="label">出勤状況一覧</div>
+        </a>
+        <a href="{{ url_for('my.schedule') }}" class="stat" style="text-decoration:none;color:inherit">
+            <div class="num">📅</div>
+            <div class="label">スケジュール登録</div>
+        </a>
+    </div>
+    <a href="{{ url_for('my.logout') }}" class="btn" style="background:#95a5a6;color:white">ログアウト（別の人に切り替え）</a>
+</div>
+{% endblock %}

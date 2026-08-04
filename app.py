@@ -9,6 +9,9 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev')
 
+from my_portal import my_bp  # noqa: E402 (個人メニュー: 勤怠ボタン・出勤状況一覧・スケジュール登録)
+app.register_blueprint(my_bp)
+
 ADMIN_PASSCODE = os.getenv('ADMIN_PASSCODE', '000000')
 
 supabase = create_client(

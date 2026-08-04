@@ -16,6 +16,10 @@
             --nm-accent: #4a7dfc;
             --nm-radius: 18px;
         }
+        {% set _bg = (session.get('bg_color') or '').split('|') %}
+        {% if _bg|length == 2 %}
+        :root { --nm-bg: {{ _bg[1] }}; --nm-text: {{ _bg[0] }}; }
+        {% endif %}
         * { margin: 0; padding: 0; box-sizing: border-box; }
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { transition: none !important; animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }

@@ -60,6 +60,7 @@ def login():
             return redirect(url_for('my.login'))
         session['staff_id'] = staff['staff_id']
         session['staff_name'] = staff['display_name']
+        session['bg_color'] = staff.get('bg_color')
         return redirect(url_for('my.home'))
 
     grouped = {}
@@ -240,6 +241,7 @@ def set_color():
         try:
             supabase.table('staff_directory').update({'bg_color': color}) \
                 .eq('staff_id', session['staff_id']).execute()
+            session['bg_color'] = color
         except Exception:
             flash('背景色の保存に失敗しました（準備中です）', 'error')
     return redirect(url_for('my.home'))

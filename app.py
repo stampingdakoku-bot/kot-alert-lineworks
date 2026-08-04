@@ -378,6 +378,22 @@ def dashboard():
             .order('employee_code') \
             .execute().data
 
+    # NeeSa/アソビバ本社/@121 カード(/boardと同じデータをダッシュボードにも表示)
+    neesa_groups = []
+    if is_today:
+        try:
+            import neesa_lw
+            import neesa_kot
+            now_jst = datetime.now(JST)
+            neesa_groups = neesa_lw.get_today_shifts(selected)
+            for g in neesa_groups:
+                for s in g['shifts']:
+                    s.setdefault('status', 'scheduled')
+            neesa_groups = neesa_kot.apply_today(neesa_groups, now_jst)
+        except Exception as e:
+            app.logger.warning('dashboard NeeSaカード取得失敗: %s', e)
+            neesa_groups = []
+
     # Unmapped staff count (exclude is_excluded=true)
     unmapped = [e for e in all_emp_data
                 if not e.get('mappings') and not e.get('is_excluded')]
@@ -445,6 +461,7 @@ def dashboard():
                            recent=recent.data,
                            unmapped_count=unmapped_count,
                            unmapped_names=unmapped[:5],
+                           neesa_groups=neesa_groups,
                            problem_late=list(problem_late.values()),
                            problem_overtime=list(problem_overtime.values()),
                            store_cards=store_cards,

@@ -69,3 +69,32 @@ def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None):
     except Exception as e:
         logger.error("予定作成エラー: %s", e)
         return False, str(e)
+
+
+def list_upcoming_events(days=14, calendar_id=None, user_id=None):
+    """今日から指定日数分の予定を、開始日時順に並べて返す(既存の読み取り専用
+    calendar.readトークンを使う neesa_lw.get_calendar_events を流用)。"""
+    from datetime import datetime, timedelta
+
+    calendar_id = calendar_id or DEFAULT_CALENDAR_ID
+    user_id = user_id or neesa_lw.DEFAULT_USER
+    base = datetime.now(neesa_lw.JST).replace(hour=0, minute=0, second=0, microsecond=0)
+    frm = base.isoformat()
+    unt = (base + timedelta(days=days)).isoformat()
+
+    events = neesa_lw.get_calendar_events(calendar_id, frm, unt, user_id=user_id)
+    out = []
+    for e in events:
+        start = e.get("start", {}) or {}
+        end = e.get("end", {}) or {}
+        dt = start.get("dateTime") or start.get("date")
+        if not dt:
+            continue
+        out.append({
+            "summary": e.get("summary", ""),
+            "start": start.get("dateTime") or start.get("date"),
+            "end": end.get("dateTime") or end.get("date"),
+            "all_day": "dateTime" not in start,
+        })
+    out.sort(key=lambda x: x["start"])
+    return out

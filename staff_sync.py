@@ -46,7 +46,7 @@ def sync_main_employees():
         rows.append({
             "external_key": key,
             "display_name": name or e.get("employee_code", ""),
-            "company": "トレコレ",
+            "company": "アソビバスターズ",
             "dept": e.get("division_name") or "",
             "kot_tenant": "main",
             "kot_employee_key": key,

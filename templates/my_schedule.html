@@ -27,4 +27,27 @@
         ※ 「合同会社NeeSa」カレンダーに登録され、勤怠ボードにも反映されます。
     </p>
 </div>
+
+<div class="card">
+    <h2>今後14日間の予定</h2>
+    {% if upcoming %}
+    <div class="table-wrap">
+    <table>
+        <tr><th>日時</th><th>内容</th></tr>
+        {% for e in upcoming %}
+        <tr>
+            <td style="white-space:nowrap">
+                {% if e.all_day %}{{ e.start }}
+                {% else %}{{ e.start[5:16].replace('-', '/').replace('T', ' ') }}
+                {% endif %}
+            </td>
+            <td>{{ e.summary }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    </div>
+    {% else %}
+    <p style="color:#999;font-size:14px">予定はありません</p>
+    {% endif %}
+</div>
 {% endblock %}

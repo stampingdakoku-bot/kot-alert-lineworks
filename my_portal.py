@@ -73,14 +73,25 @@ def logout():
     return redirect(url_for('my.login'))
 
 
+def _today_records(staff):
+    if not staff.get('kot_employee_key'):
+        return None, None
+    today = datetime.now(JST).strftime('%Y-%m-%d')
+    records = kot_write.get_today_records(staff['kot_tenant'], staff['kot_employee_key'], today)
+    clock_in = next((r['time'] for r in records if r.get('code') == '1'), None)
+    clock_out = next((r['time'] for r in records if r.get('code') == '2'), None)
+    return clock_in, clock_out
+
+
 @my_bp.route('/')
 @require_staff_login
 def home():
     staff = _get_staff(session['staff_id'])
-    return render_template('my_home.html', staff=staff)
+    clock_in, clock_out = _today_records(staff)
+    return render_template('my_home.html', staff=staff, clock_in=clock_in, clock_out=clock_out)
 
 
-@my_bp.route('/punch', methods=['GET', 'POST'])
+@my_bp.route('/punch', methods=['POST'])
 @require_staff_login
 def punch():
     staff = _get_staff(session['staff_id'])
@@ -88,34 +99,27 @@ def punch():
         flash('あなたはKoTアカウントと未紐付けのため、打刻できません', 'error')
         return redirect(url_for('my.home'))
 
-    if request.method == 'POST':
-        code = request.form.get('code')
-        if code not in ('1', '2'):
-            flash('不正な操作です', 'error')
-            return redirect(url_for('my.punch'))
-        now = datetime.now(JST)
-        ok, status_code, body = kot_write.submit_timerecord(
-            staff['kot_tenant'], staff['kot_employee_key'], code, now)
-        supabase.table('punch_audit_log').insert({
-            'staff_id': staff['staff_id'],
-            'kot_tenant': staff['kot_tenant'],
-            'employee_key': staff['kot_employee_key'],
-            'code': code,
-            'submitted_time': now.isoformat(),
-            'response_status': status_code,
-            'response_body': (body or '')[:2000],
-        }).execute()
-        if ok:
-            flash(('出勤' if code == '1' else '退勤') + 'を記録しました', 'success')
-        else:
-            flash('打刻に失敗しました。時間をおいて再度お試しください', 'error')
-        return redirect(url_for('my.punch'))
-
-    today = datetime.now(JST).strftime('%Y-%m-%d')
-    records = kot_write.get_today_records(staff['kot_tenant'], staff['kot_employee_key'], today)
-    clock_in = next((r['time'] for r in records if r.get('code') == '1'), None)
-    clock_out = next((r['time'] for r in records if r.get('code') == '2'), None)
-    return render_template('my_punch.html', staff=staff, clock_in=clock_in, clock_out=clock_out)
+    code = request.form.get('code')
+    if code not in ('1', '2'):
+        flash('不正な操作です', 'error')
+        return redirect(url_for('my.home'))
+    now = datetime.now(JST)
+    ok, status_code, body = kot_write.submit_timerecord(
+        staff['kot_tenant'], staff['kot_employee_key'], code, now)
+    supabase.table('punch_audit_log').insert({
+        'staff_id': staff['staff_id'],
+        'kot_tenant': staff['kot_tenant'],
+        'employee_key': staff['kot_employee_key'],
+        'code': code,
+        'submitted_time': now.isoformat(),
+        'response_status': status_code,
+        'response_body': (body or '')[:2000],
+    }).execute()
+    if ok:
+        flash(('出勤' if code == '1' else '退勤') + 'を記録しました', 'success')
+    else:
+        flash('打刻に失敗しました。時間をおいて再度お試しください', 'error')
+    return redirect(url_for('my.home'))
 
 
 @my_bp.route('/overview', methods=['GET', 'POST'])
@@ -124,18 +128,20 @@ def overview():
     staff = _get_staff(session['staff_id'])
     prefs = attendance_unified.get_preferences(staff['staff_id'])
 
-    if request.method == 'POST':
-        hidden = request.form.getlist('hide')
-        attendance_unified.save_preferences(staff['staff_id'], hidden)
-        flash('表示設定を保存しました', 'success')
-        return redirect(url_for('my.overview'))
-
-    hidden_set = set(prefs.get('hidden_names') or [])
     all_status = attendance_unified.get_unified_status()
     grouped = {}
     for s in all_status:
-        grouped.setdefault((s['company'], s['dept']), []).append(s)
-    return render_template('my_overview.html', grouped=grouped, hidden_set=hidden_set)
+        grouped.setdefault(f"{s['company']}|{s['dept']}", []).append(s)
+    group_list = [(key, key.replace('|', ' / ')) for key in grouped.keys()]
+
+    if request.method == 'POST':
+        shown = set(request.form.getlist('show'))
+        hidden = [key for key, _ in group_list if key not in shown]
+        attendance_unified.save_preferences(staff['staff_id'], hidden)
+        return redirect(url_for('my.overview'))
+
+    hidden_set = set(prefs.get('hidden_names') or [])
+    return render_template('my_overview.html', grouped=grouped, group_list=group_list, hidden_set=hidden_set)
 
 
 @my_bp.route('/schedule', methods=['GET', 'POST'])
@@ -164,4 +170,7 @@ def schedule():
             flash('予定の登録に失敗しました', 'error')
         return redirect(url_for('my.schedule'))
 
-    return render_template('my_schedule.html', staff=staff, today=datetime.now(JST).strftime('%Y-%m-%d'))
+    upcoming = lw_calendar_write.list_upcoming_events()
+    return render_template('my_schedule.html', staff=staff,
+                           today=datetime.now(JST).strftime('%Y-%m-%d'),
+                           upcoming=upcoming)

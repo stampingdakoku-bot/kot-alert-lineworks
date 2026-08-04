@@ -12,6 +12,13 @@
             本日の出勤: <strong>{{ clock_in[11:16] if clock_in else '未打刻' }}</strong>
             本日の退勤: <strong>{{ clock_out[11:16] if clock_out else '未打刻' }}</strong>
         </p>
+        {% if not clock_in %}
+        <p style="color:#2c3e50;font-size:14px;margin-bottom:12px">おはようございます。本日もよろしくお願いします。</p>
+        {% elif clock_out %}
+        <p style="color:#2c3e50;font-size:14px;margin-bottom:12px">
+            本日もお疲れ様でした。{% if next_shift_date %}次回は{{ next_shift_date }}{% else %}次回{% endif %}もよろしくお願いします。
+        </p>
+        {% endif %}
         <div style="display:flex;gap:12px;flex-wrap:wrap">
             <form method="POST" action="{{ url_for('my.punch') }}" onsubmit="return confirm('出勤打刻を記録します。よろしいですか？');">
                 <input type="hidden" name="code" value="1">
@@ -38,12 +45,30 @@
         </a>
     </div>
 
-    <div style="margin-top:24px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:13px;color:#666">背景色</span>
-        <form method="POST" action="{{ url_for('my.set_color') }}" style="margin:0">
-            <input type="color" name="bg_color" value="{{ staff.bg_color or '#f5f5f5' }}"
-                   onchange="this.form.requestSubmit()"
-                   style="width:44px;height:36px;padding:2px;border:1px solid #ddd;border-radius:4px;cursor:pointer;min-height:auto">
+    <div style="margin-top:24px">
+        <div style="font-size:14px;color:#666;text-align:center;margin-bottom:16px">カラースタイルを選択してください</div>
+        <form method="POST" action="{{ url_for('my.set_color') }}" id="colorForm">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:420px;margin:0 auto">
+            {% for name, hex in [
+                ('サクラ', '#F4A6A0'), ('ミント', '#3FBF9F'), ('タンポポ', '#E0A73C'), ('アジサイ', '#6FA9E0'),
+                ('プルーン', '#3457A6'), ('アセロラ', '#E0605D'), ('オリーブ', '#7C8C4A'), ('ブラックベリー', '#2B3A55')
+            ] %}
+            <label style="text-align:center;cursor:pointer">
+                <input type="radio" name="bg_color" value="{{ hex }}" style="display:none"
+                       {{ 'checked' if staff.bg_color == hex }}
+                       onchange="this.form.requestSubmit()">
+                <div style="width:52px;height:52px;border-radius:50%;background:{{ hex }};margin:0 auto 6px;
+                            position:relative;{{ 'box-shadow:0 0 0 3px white,0 0 0 5px #3498db' if staff.bg_color == hex }}">
+                    {% if staff.bg_color == hex %}
+                    <span style="position:absolute;bottom:-2px;right:-2px;background:#3498db;color:white;
+                                  border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;
+                                  border:2px solid white">✓</span>
+                    {% endif %}
+                </div>
+                <div style="font-size:12px;color:#666">{{ name }}</div>
+            </label>
+            {% endfor %}
+        </div>
         </form>
     </div>
 

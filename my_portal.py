@@ -85,12 +85,28 @@ def _today_records(staff):
     return clock_in, clock_out
 
 
+def _next_shift_date(staff):
+    """次回の出勤予定日(月/日表記)を返す。NeeSaテナントはシフトカレンダーから
+    算出、本体テナントは同等の簡易照会が未実装のためNoneを返す。"""
+    if staff.get('kot_tenant') != 'neesa':
+        return None
+    tomorrow = (datetime.now(JST) + timedelta(days=1)).date()
+    names_by_date = neesa_lw.get_names_by_date_range(tomorrow, tomorrow + timedelta(days=30))
+    for d in sorted(names_by_date):
+        if staff['display_name'] in names_by_date[d]:
+            d_obj = datetime.strptime(d, '%Y-%m-%d')
+            return f'{d_obj.month}/{d_obj.day}'
+    return None
+
+
 @my_bp.route('/')
 @require_staff_login
 def home():
     staff = _get_staff(session['staff_id'])
     clock_in, clock_out = _today_records(staff)
-    return render_template('my_home.html', staff=staff, clock_in=clock_in, clock_out=clock_out)
+    next_shift_date = _next_shift_date(staff) if clock_out else None
+    return render_template('my_home.html', staff=staff, clock_in=clock_in, clock_out=clock_out,
+                           next_shift_date=next_shift_date)
 
 
 @my_bp.route('/punch', methods=['POST'])

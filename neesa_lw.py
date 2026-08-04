@@ -32,10 +32,11 @@ DEFAULT_USER = "s-tatsuya2015@works-42585"
 SHIFT_CALENDARS = [
     {"calendar_id": "b6cc3c42-23e0-462c-a5e7-ca3c272f12bc"},  # 合同会社NeeSa
     {"calendar_id": "dfe29717-15f2-4fce-92b7-2b4baa37f4a2"},  # AceCosme 発送メンバー
-    # ディアメント/@121専用カレンダー。calendar_id判明後、下のコメントを外して有効化。
-    # force_group指定でこのカレンダーの予定は氏名マッピング不要、全てそのグループへ。
-    # {"calendar_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "force_group": ("ディアメント", "@121")},
 ]
+
+# ディアメント/@121専用カレンダー（@121 spa&mart）。9-17形式でない特殊フォーマットのため
+# SHIFT_CALENDARS/parse_shiftとは別に、専用パーサ(parse_at121)で読む。
+AT121_CALENDAR_ID = "c_400183117_8750460c-3816-4fdd-88f9-169e3e1d57b9"
 
 # 名前 → (会社, 部署) の個別マッピング（基本所属）。未登録は DEFAULT_GROUP。
 # ※ シフト名の語尾に「@121」が付くと、その日はこのマッピングを上書きして
@@ -89,13 +90,13 @@ KOT_NAME_ALIAS = {"佐藤": "佐々木果歩"}
 # 同姓の曖昧さ回避: カレンダー名(lastName) → 採用するKoTフルネーム
 # 「大井」はスケジュールを持つ大井夏美を指す。同姓の大井蒼太はスケジュールが
 # 無いため下の KOT_EXTRA_FULLNAMES で「蒼太」として打刻時のみ別表示する。
-KOT_FULLNAME = {"大井": "大井夏美"}
+KOT_FULLNAME = {"大井": "大井夏美", "松田": "松田愛"}  # 松田: NeeSa総務部と@121兼任、KoT同姓(松田愛/松田唯)を松田愛に確定
 # KoTフルネーム → (表示名, (会社, 部署))。姓だけだと同姓と衝突する人を、
 # KoT打刻があった日のみ別表示名で出す（例: 大井蒼太 → 「蒼太」を発送へ）。
 KOT_EXTRA_FULLNAMES = {"大井蒼太": ("蒼太", ("NeeSa", "発送部"))}
 # 打刻が特殊な人: KoT打刻でなくLINEスケジュールの時間で状態判定
 # （開始前=予定 / 時間内=出勤中 / 終了後=退勤済）
-SCHEDULE_BASED_NAMES = {"山藤", "三鹿"}
+SCHEDULE_BASED_NAMES = {"山藤", "三鹿", "歩"}  # 歩=坂本歩(役員・KoTアカウントなし)
 # NeeSa KoTではなくトレコレKoT(既存KOT_TOKEN)で打刻する人 → 当日打刻で表示
 CROSS_KOT_NAMES = {"宮崎", "河村", "森岡"}
 # トレコレKoT側で同姓が複数いる人の確定: 名字 → 採用するフルネーム
@@ -236,6 +237,94 @@ def _applies_on(comp, target_date):
     return False
 
 
+# @121カレンダー: シフトでない行を除外する語
+_AT121_EXCLUDE_RE = re.compile(r"定休日|有給|休み|オープニング|イベント|🎉")
+# @121カレンダー: 人名に付く注記・兼務表記（長い順に）
+_AT121_NOISE = ["5階兼任", "5階兼", "兼任", "出勤可", "5階"]
+
+
+def _clean_at121_name(text):
+    """@121のsummaryから人名だけ抽出。全角/半角スペース以降の注記を落とし付帯語を除去。"""
+    if not text:
+        return ""
+    name = text.replace("　", " ").strip()
+    name = name.split(" ")[0]
+    for noise in _AT121_NOISE:
+        name = name.replace(noise, "")
+    return name.strip()
+
+
+def parse_at121(comp):
+    """@121イベントを解析。返り値 dict(name,start,end) / 対象外はNone。
+    時刻: テキスト時間(930-1330) ＞ イベントのdateTime ＞ なし(終日)。"""
+    summary = (comp.get("summary") or "").strip()
+    if not summary or _AT121_EXCLUDE_RE.search(summary):
+        return None
+    m = _SHIFT_RE.match(summary)
+    if m:  # 例 930-1330久保田 / 9-1645松田
+        s_time, e_time = _fmt_time(m.group(1)), _fmt_time(m.group(2))
+        name = _clean_at121_name(m.group(3))
+    else:
+        name = _clean_at121_name(summary)
+        start, end = comp.get("start", {}) or {}, comp.get("end", {}) or {}
+        if start.get("dateTime"):
+            try:
+                sd = isoparse(start["dateTime"]); s_time = "%d:%02d" % (sd.hour, sd.minute)
+            except (ValueError, TypeError):
+                s_time = None
+            try:
+                ed = isoparse(end["dateTime"]) if end.get("dateTime") else None
+                e_time = "%d:%02d" % (ed.hour, ed.minute) if ed else None
+            except (ValueError, TypeError):
+                e_time = None
+        else:
+            s_time = e_time = None  # 終日
+    if not name:
+        return None
+    return {"name": name, "start": s_time, "end": e_time}
+
+
+def _applies_on_at121(comp, target_date):
+    """@121用の該当判定。時刻あり(dateTime)は _applies_on を流用、
+    終日(date)は 開始日<=target<終了日。繰り返し終日はRRULE展開。"""
+    start = comp.get("start", {}) or {}
+    if start.get("dateTime"):
+        return _applies_on(comp, target_date)
+    sd = start.get("date")
+    if not sd:
+        return False
+    try:
+        d0 = datetime.strptime(sd, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return False
+    ed = (comp.get("end", {}) or {}).get("date")
+    try:
+        d1 = datetime.strptime(ed, "%Y-%m-%d").date() if ed else d0 + timedelta(days=1)
+    except (ValueError, TypeError):
+        d1 = d0 + timedelta(days=1)
+    rec = comp.get("recurrence")
+    if rec:
+        dtstart = datetime(d0.year, d0.month, d0.day)
+        rset = _rrule.rruleset(); has_rule = False
+        for line in rec:
+            if line.startswith("RRULE:"):
+                try:
+                    rset.rrule(_rrule.rrulestr(line[6:], dtstart=dtstart)); has_rule = True
+                except (ValueError, TypeError):
+                    pass
+            elif line.startswith("EXDATE"):
+                for d in line.split(":", 1)[-1].split(","):
+                    try:
+                        rset.exdate(datetime.strptime(d.strip().split("T")[0], "%Y%m%d"))
+                    except ValueError:
+                        pass
+        if has_rule:
+            day0 = datetime(target_date.year, target_date.month, target_date.day)
+            return any(o.date() == target_date
+                       for o in rset.between(day0, day0 + timedelta(days=1), inc=True))
+    return d0 <= target_date < d1
+
+
 def get_today_shifts(target_date=None):
     """全シフトカレンダーから当日のシフトを取得し、名前→部署マッピングで
     会社/部署ごとにまとめる。繰り返しはRRULE展開で当日分のみ・名前で重複排除。
@@ -264,10 +353,27 @@ def get_today_shifts(target_date=None):
                 parsed["force_group"] = cal["force_group"]
             seen.setdefault(parsed["name"], parsed)
 
+    # @121カレンダー（専用パーサ。氏名マッピング不要で全員@121へ）
+    at121_seen = {}
+    for c in get_calendar_events(AT121_CALENDAR_ID, frm, unt):
+        p = parse_at121(c)
+        if not p or not _applies_on_at121(c, target_date):
+            continue
+        if p["name"] in EXCLUDE_NAMES:
+            continue
+        p["summary"] = c.get("summary", "")
+        p["remote"] = p["name"] in REMOTE_NAMES
+        p["status"] = "scheduled"
+        p["unmapped"] = False
+        at121_seen.setdefault(p["name"], p)
+
     # 名前 → (会社, 部署) で振り分け。@121マーカー付きは上書きで@121へ。
     # DEPT_MAP未登録(既定の発送行き)は unmapped=True で通知対象にする。
+    # @121カレンダーに同名が出ている場合はそちらを優先し、通常部署側からは除外(dedup)。
     grouped = {}
     for name, s in seen.items():
+        if name in at121_seen:
+            continue
         if s.get("force_group"):
             key = s["force_group"]
             s["unmapped"] = False
@@ -281,6 +387,8 @@ def get_today_shifts(target_date=None):
             key = DEFAULT_GROUP
             s["unmapped"] = True
         grouped.setdefault(key, []).append(s)
+    for name, s in at121_seen.items():
+        grouped.setdefault(AT121_GROUP, []).append(s)
     # 対象ゼロでも常時表示する枠を確保
     for cd in ALWAYS_SHOW:
         grouped.setdefault(cd, [])
@@ -296,7 +404,7 @@ def get_today_shifts(target_date=None):
         groups.append({
             "company": company,
             "dept": dept,
-            "shifts": sorted(shifts, key=lambda s: s["start"]),
+            "shifts": sorted(shifts, key=lambda s: (s.get("start") is None, s.get("start") or "")),
         })
     return groups
 

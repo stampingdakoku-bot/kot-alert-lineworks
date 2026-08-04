@@ -41,15 +41,68 @@ FLOW_LABELS = {
 }
 
 
+NOTICE_SENDER_EXTRA = {'矢垰'}  # 総務部以外で個人お知らせの送信権限を持つ人
+
+
+def _can_send_notice(staff):
+    return staff.get('dept') == '総務部' or staff.get('display_name') in NOTICE_SENDER_EXTRA
+
+
 def _my_notifications(staff, limit=20):
-    """本人宛のアラート通知のみ取得(alerts_sentはトレコレ本体テナントのみ運用のため、
-    NeeSaテナントのスタッフでは常に空になる)"""
+    """本人宛の自動アラート通知(alerts_sent)と総務等からの個人お知らせ(personal_notices)を
+    まとめて新しい順で返す。alerts_sentはトレコレ本体テナントのみ運用のためNeeSaテナントの
+    スタッフでは常に空になる。personal_noticesテーブル未作成の環境でも壊れないようtry/exceptで守る。"""
+    items = []
     key = staff.get('kot_employee_key')
-    if not key:
-        return []
-    result = supabase.table('alerts_sent').select('*') \
-        .eq('employee_key', key).order('created_at', desc=True).limit(limit).execute()
-    return result.data
+    if key:
+        try:
+            result = supabase.table('alerts_sent').select('*') \
+                .eq('employee_key', key).order('created_at', desc=True).limit(limit).execute()
+            for a in result.data:
+                items.append({
+                    'created_at': a.get('created_at'),
+                    'kind': 'alert',
+                    'flow_type': a.get('flow_type'),
+                    'message': a.get('message') or '',
+                    'sender_name': None,
+                })
+        except Exception:
+            pass
+    try:
+        result2 = supabase.table('personal_notices') \
+            .select('*, sender:sender_staff_id(display_name)') \
+            .eq('recipient_staff_id', staff['staff_id']) \
+            .order('created_at', desc=True).limit(limit).execute()
+        for n in result2.data:
+            sender = (n.get('sender') or {}).get('display_name') or '総務'
+            items.append({
+                'created_at': n.get('created_at'),
+                'kind': 'notice',
+                'flow_type': None,
+                'message': n.get('message') or '',
+                'sender_name': sender,
+            })
+    except Exception:
+        pass
+    items.sort(key=lambda x: x['created_at'] or '', reverse=True)
+    return items[:limit]
+
+
+def _unread_notice_count(staff_id):
+    try:
+        r = supabase.table('personal_notices').select('id', count='exact') \
+            .eq('recipient_staff_id', staff_id).eq('is_read', False).execute()
+        return r.count or 0
+    except Exception:
+        return 0
+
+
+def _mark_notices_read(staff_id):
+    try:
+        supabase.table('personal_notices').update({'is_read': True}) \
+            .eq('recipient_staff_id', staff_id).eq('is_read', False).execute()
+    except Exception:
+        pass
 
 
 def require_staff_login(view):
@@ -157,9 +210,13 @@ def home():
     staff = _get_staff(session['staff_id'])
     clock_in, clock_out = _today_records(staff)
     next_shift_date = _next_shift_date(staff) if clock_out else None
+    unread_notice_count = _unread_notice_count(staff['staff_id'])
     notifications = _my_notifications(staff)
+    _mark_notices_read(staff['staff_id'])
     return render_template('my_home.html', staff=staff, clock_in=clock_in, clock_out=clock_out,
                            next_shift_date=next_shift_date, notifications=notifications,
+                           unread_notice_count=unread_notice_count,
+                           can_send_notice=_can_send_notice(staff),
                            flow_labels=FLOW_LABELS)
 
 
@@ -386,6 +443,53 @@ def schedule_delete(event_id):
     else:
         flash('予定の削除に失敗しました', 'error')
     return redirect(url_for('my.schedule', month=month_ctx))
+
+
+@my_bp.route('/notify', methods=['GET', 'POST'])
+@require_staff_login
+def notify():
+    staff = _get_staff(session['staff_id'])
+    if not _can_send_notice(staff):
+        flash('この機能を利用する権限がありません', 'error')
+        return redirect(url_for('my.home'))
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'send')
+        try:
+            if action == 'add_template':
+                text = (request.form.get('template_text') or '').strip()
+                if text:
+                    supabase.table('notice_templates').insert({'text': text}).execute()
+                    flash('定型文を追加しました', 'success')
+                return redirect(url_for('my.notify'))
+            if action == 'delete_template':
+                template_id = request.form.get('template_id')
+                if template_id:
+                    supabase.table('notice_templates').delete().eq('id', template_id).execute()
+                    flash('定型文を削除しました', 'success')
+                return redirect(url_for('my.notify'))
+
+            recipient_id = request.form.get('recipient_id')
+            message = (request.form.get('message') or '').strip()
+            if not (recipient_id and message):
+                flash('宛先とメッセージを入力してください', 'error')
+                return redirect(url_for('my.notify'))
+            supabase.table('personal_notices').insert({
+                'sender_staff_id': staff['staff_id'],
+                'recipient_staff_id': recipient_id,
+                'message': message,
+            }).execute()
+            flash('お知らせを送信しました', 'success')
+        except Exception:
+            flash('処理に失敗しました（DBのテーブルが未作成の可能性があります）', 'error')
+        return redirect(url_for('my.notify'))
+
+    recipients = [s for s in _get_staff_list() if s['staff_id'] != staff['staff_id']]
+    try:
+        templates = supabase.table('notice_templates').select('*').order('created_at').execute().data
+    except Exception:
+        templates = []
+    return render_template('my_notify.html', staff=staff, recipients=recipients, templates=templates)
 
 
 @my_bp.route('/color', methods=['POST'])

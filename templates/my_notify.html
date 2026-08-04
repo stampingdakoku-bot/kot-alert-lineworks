@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}お知らせを送る{% endblock %}
+{% block content %}
+<style>
+{% set _bg = (staff.bg_color or '').split('|') %}
+{% if _bg|length == 2 %}
+:root { --nm-bg: {{ _bg[1] }}; --nm-text: {{ _bg[0] }}; }
+{% endif %}
+</style>
+
+<div class="card">
+    <h2>お知らせを送る</h2>
+    <form method="POST">
+        <input type="hidden" name="action" value="send">
+        <div class="form-row">
+            <label>宛先</label>
+            <select name="recipient_id" required style="flex:1;min-width:200px">
+                <option value="" disabled selected>選択してください</option>
+                {% set ns = namespace(company=None) %}
+                {% for r in recipients %}
+                {% if r.company != ns.company %}
+                {% if ns.company is not none %}</optgroup>{% endif %}
+                <optgroup label="{{ r.company }}">
+                {% set ns.company = r.company %}
+                {% endif %}
+                <option value="{{ r.staff_id }}">{{ r.display_name }}（{{ r.dept }}）</option>
+                {% endfor %}
+                {% if ns.company is not none %}</optgroup>{% endif %}
+            </select>
+        </div>
+
+        <div style="margin:12px 0">
+            <div style="font-size:12px;color:var(--nm-text-dim);margin-bottom:6px">定型文（クリックで下欄に反映されます）</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+                {% for t in templates %}
+                <button type="button" class="btn" style="padding:6px 14px;font-size:13px" onclick="useTemplate({{ t.text|tojson }})">{{ t.text }}</button>
+                {% endfor %}
+                {% if not templates %}
+                <span style="font-size:13px;color:var(--nm-text-dim)">まだ定型文がありません</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-row" style="align-items:flex-start">
+            <label>内容</label>
+            <textarea name="message" id="messageBox" rows="4" required style="flex:1;width:100%" placeholder="お知らせ内容を入力してください"></textarea>
+        </div>
+        <button type="submit" class="btn btn-success">送信する</button>
+        <a href="{{ url_for('my.home') }}" class="btn">戻る</a>
+    </form>
+</div>
+
+<div class="card">
+    <h2 style="font-size:15px">定型文の管理</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        {% for t in templates %}
+        <div class="nm-surface" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:12px">
+            <span style="font-size:13px">{{ t.text }}</span>
+            <form method="POST" style="margin:0" onsubmit="return confirm('この定型文を削除しますか？')">
+                <input type="hidden" name="action" value="delete_template">
+                <input type="hidden" name="template_id" value="{{ t.id }}">
+                <button type="submit" class="btn" style="padding:4px 10px;font-size:12px">削除</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    <form method="POST" style="display:flex;gap:8px">
+        <input type="hidden" name="action" value="add_template">
+        <input type="text" name="template_text" placeholder="新しい定型文を入力" required style="flex:1">
+        <button type="submit" class="btn btn-primary">追加</button>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function useTemplate(text) {
+    document.getElementById('messageBox').value = text;
+}
+</script>
+{% endblock %}

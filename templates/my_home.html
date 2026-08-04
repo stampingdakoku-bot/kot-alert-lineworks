@@ -8,6 +8,12 @@
 {% endif %}
 </style>
 <div class="card">
+    {% if unread_notice_count and unread_notice_count > 0 %}
+    <a href="#notices" style="display:block;background:var(--nm-accent);color:white;padding:10px 16px;border-radius:12px;
+              text-align:center;text-decoration:none;font-weight:bold;font-size:14px;margin-bottom:16px">
+        🔔 お知らせが{{ unread_notice_count }}件あります
+    </a>
+    {% endif %}
     <h2 style="text-align:center">{{ staff.display_name }} さん（{{ staff.company }} / {{ staff.dept }}）</h2>
 
     <div style="margin-top:16px;text-align:center">
@@ -49,10 +55,16 @@
             <div class="num">👥</div>
             <div class="label">出勤状況一覧</div>
         </a>
+        {% if can_send_notice %}
+        <a href="{{ url_for('my.notify') }}" class="stat" style="text-decoration:none;color:inherit">
+            <div class="num">📣</div>
+            <div class="label">お知らせを送る</div>
+        </a>
+        {% endif %}
     </div>
 
-    <div style="margin-top:24px">
-        <div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">最近の通知</div>
+    <div id="notices" style="margin-top:24px;scroll-margin-top:20px">
+        <div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">あなたにお知らせ</div>
         {% if notifications %}
         <div class="table-wrap" style="max-height:320px;overflow-y:auto">
         <table>
@@ -62,9 +74,13 @@
                 <tr>
                     <td style="white-space:nowrap;font-size:12px">{{ notif.created_at|to_jst }}</td>
                     <td>
+                        {% if notif.kind == 'notice' %}
+                        <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:var(--nm-accent);color:white;white-space:nowrap">{{ notif.sender_name }}より</span>
+                        {% else %}
                         {% set ft = notif.flow_type %}
                         {% set is_warn = ft in ('late_clockin', 'overtime', 'deviation') %}
                         <span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ '#e74c3c' if is_warn else '#3498db' }};color:white;white-space:nowrap">{{ flow_labels.get(ft, ft) }}</span>
+                        {% endif %}
                     </td>
                     <td style="white-space:pre-wrap;word-break:break-all;font-size:12px;color:var(--nm-text-dim)">{{ notif.message or '' }}</td>
                 </tr>
@@ -73,7 +89,7 @@
         </table>
         </div>
         {% else %}
-        <p style="color:var(--nm-text-dim);font-size:13px">通知はまだありません</p>
+        <p style="color:var(--nm-text-dim);font-size:13px">お知らせはまだありません</p>
         {% endif %}
     </div>
 

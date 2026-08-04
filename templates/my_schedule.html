@@ -72,6 +72,9 @@
             <div class="form-row"><label>内容</label><input type="text" name="title" id="f_title" placeholder="例: 外出" required style="flex:1"></div>
             <div class="form-row"><label>開始時刻</label><input type="time" name="start_time" id="f_start" required></div>
             <div class="form-row"><label>終了時刻</label><input type="time" name="end_time" id="f_end" required></div>
+            <p id="recurringEditNote" style="display:none;color:var(--nm-text-dim);font-size:12px;margin-bottom:8px">
+                ※ 繰り返し予定は時刻を変更できません。時刻を変えたい場合は削除して登録し直してください。
+            </p>
             <div id="repeatSection">
                 <div class="form-row">
                     <label>繰り返し</label>
@@ -197,6 +200,9 @@ function resetForm() {
     document.getElementById('f_recurrence').value = '[]';
     document.getElementById('repeatSection').style.display = '';
     document.getElementById('f_cancel_edit').style.display = 'none';
+    document.getElementById('f_start').readOnly = false;
+    document.getElementById('f_end').readOnly = false;
+    document.getElementById('recurringEditNote').style.display = 'none';
     document.getElementById('eventForm').querySelector('button[type=submit]').textContent = '登録する';
 }
 
@@ -212,6 +218,11 @@ function editEventAt(idx) {
     document.getElementById('f_recurrence').value = JSON.stringify(ev.recurrence || []);
     document.getElementById('repeatSection').style.display = 'none';
     document.getElementById('f_cancel_edit').style.display = 'inline-block';
+    // 繰り返し予定は時刻を変更すると既存の「この予定だけ削除」設定が失われるため、
+    // 編集では時刻を変更不可にする(変更したい場合は削除して登録し直す運用とする)
+    document.getElementById('f_start').readOnly = ev.is_recurring;
+    document.getElementById('f_end').readOnly = ev.is_recurring;
+    document.getElementById('recurringEditNote').style.display = ev.is_recurring ? 'block' : 'none';
     document.getElementById('eventForm').querySelector('button[type=submit]').textContent = '更新する';
 }
 

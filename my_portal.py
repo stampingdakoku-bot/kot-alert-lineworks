@@ -289,6 +289,10 @@ def schedule_edit(event_id):
         recurrence = json.loads(recurrence_json)
     except (ValueError, TypeError):
         recurrence = []
+    if recurrence:
+        # 開始時刻を変更した場合、既存のEXDATE(除外occurrence)の時刻もずれるため
+        # 新しい開始時刻に合わせて付け替える(でないと削除済みのoccurrenceが復活する)
+        recurrence = lw_calendar_write.remap_exdate_times(recurrence, start_dt.time())
 
     summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
     ok, detail = lw_calendar_write.update_event(event_id, summary, start_dt, end_dt, recurrence=recurrence or None)

@@ -60,10 +60,10 @@
     </div>
 </div>
 
-{# ===== タブ切り替え(リアルタイム / シフト予定) ===== #}
-<div style="display:flex;gap:8px;margin-bottom:16px">
-    <button type="button" class="btn tab-btn" data-tab="realtime" onclick="switchDashTab('realtime')">リアルタイム</button>
-    <button type="button" class="btn tab-btn" data-tab="shift" onclick="switchDashTab('shift')">シフト予定</button>
+{# ===== タブ切り替え(リアルタイム / シフト予定) セグメントコントロール ===== #}
+<div class="segmented-control" role="tablist" style="margin-bottom:16px">
+    <button type="button" class="segment" role="tab" data-tab="realtime" onclick="switchDashTab('realtime')">リアルタイム</button>
+    <button type="button" class="segment" role="tab" data-tab="shift" onclick="switchDashTab('shift')">シフト予定</button>
 </div>
 
 <div id="tabpane-realtime">
@@ -324,7 +324,19 @@
 {# ↑ tabpane-shift終わり #}
 
 <style>
-.tab-btn.active { box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); color: var(--nm-accent); }
+.segmented-control {
+    display: inline-flex; gap: 4px; padding: 4px; border-radius: 16px; background: var(--nm-bg);
+    box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light);
+}
+.segment {
+    border: none; background: transparent; font-family: inherit; cursor: pointer;
+    padding: 9px 22px; border-radius: 12px; font-size: 14px; font-weight: 600;
+    color: var(--nm-text-dim); transition: box-shadow .15s ease, color .15s ease, background .15s ease;
+}
+.segment.active {
+    background: var(--nm-bg); color: var(--nm-accent);
+    box-shadow: -3px -3px 6px var(--nm-shadow-light), 3px 3px 6px var(--nm-shadow-dark);
+}
 
 @keyframes blink-green-rt { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 .person-card-rt { position:relative; border-radius:12px; padding:12px 12px 12px 28px; min-width:160px;
@@ -488,7 +500,7 @@
     window.switchDashTab = function(name) {
         document.getElementById('tabpane-realtime').style.display = name === 'realtime' ? '' : 'none';
         document.getElementById('tabpane-shift').style.display = name === 'shift' ? '' : 'none';
-        document.querySelectorAll('.tab-btn').forEach(function(b) {
+        document.querySelectorAll('.segment').forEach(function(b) {
             b.classList.toggle('active', b.dataset.tab === name);
         });
     };

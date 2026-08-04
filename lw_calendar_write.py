@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 import jwt
+from dateutil import rrule as _rrule
+from dateutil.parser import isoparse as _isoparse
 
 import neesa_lw
 
@@ -60,7 +62,7 @@ def create_event(summary, start_dt, end_dt, calendar_id=None, user_id=None, recu
     }
     if recurrence:
         comp["recurrence"] = recurrence
-    body = {"eventComponents": [comp]}
+    body = {"eventComponents": [comp], "sendNotification": False}
     try:
         resp = requests.post(
             url, headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
@@ -90,13 +92,14 @@ def update_event(event_id, summary, start_dt, end_dt, recurrence=None, calendar_
         return False, str(e)
 
     comp = {
+        "eventId": event_id,
         "summary": summary,
         "start": {"dateTime": start_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
         "end": {"dateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%S"), "timeZone": "Asia/Tokyo"},
     }
     if recurrence:
         comp["recurrence"] = recurrence
-    body = {"eventComponents": [comp]}
+    body = {"eventComponents": [comp], "sendNotification": False}
     try:
         resp = requests.put(
             _events_url(event_id, calendar_id, user_id),
@@ -122,7 +125,8 @@ def delete_event(event_id, calendar_id=None, user_id=None):
     try:
         resp = requests.delete(
             _events_url(event_id, calendar_id, user_id),
-            headers={"Authorization": "Bearer " + token}, timeout=30,
+            headers={"Authorization": "Bearer " + token},
+            params={"sendNotification": "false"}, timeout=30,
         )
         if resp.status_code in (200, 204):
             return True, None
@@ -153,6 +157,62 @@ def _get_events_raw(from_dt, until_dt, calendar_id=None, user_id=None):
         return []
 
 
+def _occurs_on(comp, target_date):
+    """comp(eventComponent)がtarget_dateに出現するか判定する。
+
+    neesa_lw._applies_on と同種の判定だが、こちらは全て内部でUTC-naiveに揃えて
+    dateutil.rruleに渡す。理由: LINE WORKS側はUNTILを保存すると必ず末尾にZ(UTC)を
+    付けて返すため、dtstart側がnaive(JSTのつもりの素の時刻)のままだと
+    dateutilが「naiveとawareの比較」で例外を出し、_applies_on側のtry/exceptで
+    黙って握りつぶされてRRULEが完全に無視される(＝DTSTART当日にしか一致しなくなる)
+    不具合が生じることを確認したため、専用に実装している。"""
+    start = comp.get("start", {})
+    sdt = start.get("dateTime")
+    if not sdt:
+        return False
+    try:
+        dtstart_naive = _isoparse(sdt).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return False
+    dtstart_utc = dtstart_naive.replace(tzinfo=neesa_lw.JST).astimezone(timezone.utc).replace(tzinfo=None)
+
+    rec = comp.get("recurrence") or []
+    if not rec:
+        return dtstart_naive.date() == target_date
+
+    rset = _rrule.rruleset()
+    has_rule = False
+    for line in rec:
+        if line.startswith("RRULE:"):
+            rule_str = re.sub(r'UNTIL=(\d{8}T\d{6})Z', r'UNTIL=\1', line[len("RRULE:"):])
+            try:
+                rset.rrule(_rrule.rrulestr(rule_str, dtstart=dtstart_utc))
+                has_rule = True
+            except (ValueError, TypeError):
+                pass
+        elif line.startswith("EXDATE"):
+            val = line.split(":", 1)[-1]
+            for d in val.split(","):
+                d = d.strip().rstrip("Z")
+                try:
+                    exdt_naive = datetime.strptime(d, "%Y%m%dT%H%M%S")
+                    exdt_utc = exdt_naive.replace(tzinfo=neesa_lw.JST).astimezone(timezone.utc).replace(tzinfo=None)
+                    rset.exdate(exdt_utc)
+                except ValueError:
+                    pass
+    if not has_rule:
+        return dtstart_naive.date() == target_date
+
+    day0_jst = datetime(target_date.year, target_date.month, target_date.day, tzinfo=neesa_lw.JST)
+    window_start = (day0_jst - timedelta(hours=1)).astimezone(timezone.utc).replace(tzinfo=None)
+    window_end = (day0_jst + timedelta(days=1, hours=1)).astimezone(timezone.utc).replace(tzinfo=None)
+    for occ in rset.between(window_start, window_end, inc=True):
+        occ_jst_date = occ.replace(tzinfo=timezone.utc).astimezone(neesa_lw.JST).date()
+        if occ_jst_date == target_date:
+            return True
+    return False
+
+
 def get_my_events(display_name, start_date, end_date, calendar_id=None, user_id=None):
     """summaryにdisplay_nameを含む予定をeventId付きで返す(本人の予定の閲覧・編集・削除用)。
     戻り値: {date_iso: [{event_id, summary, start_time, end_time, recurrence}, ...]}"""
@@ -168,8 +228,8 @@ def get_my_events(display_name, start_date, end_date, calendar_id=None, user_id=
         d += timedelta(days=1)
 
     for e in raw_events:
-        event_id = e.get("eventId")
         for comp in e.get("eventComponents", []):
+            event_id = comp.get("eventId")
             summary = comp.get("summary", "")
             if display_name not in summary:
                 continue
@@ -187,7 +247,7 @@ def get_my_events(display_name, start_date, end_date, calendar_id=None, user_id=
             recurrence = comp.get("recurrence") or []
             d = start_date
             while d <= end_date:
-                if neesa_lw._applies_on(comp, d):
+                if _occurs_on(comp, d):
                     result[d.isoformat()].append({
                         'event_id': event_id,
                         'summary': summary,
@@ -240,6 +300,27 @@ def exclude_occurrence(recurrence, occurrence_dt_local):
     new_rec = list(recurrence)
     new_rec.append(f"EXDATE;TZID=Asia/Tokyo:{exdate_str}")
     return new_rec
+
+
+def remap_exdate_times(recurrence, new_time):
+    """EXDATE行の時刻部分を new_time(datetime.time) に置き換える。
+    編集で開始時刻を変更すると、既存のEXDATE(除外日時)が新時刻と一致せず
+    無効化されてしまい、削除したはずのoccurrenceが復活してしまうため、
+    編集時は必ずこれを通してから update_event に渡す。"""
+    new_hms = new_time.strftime("%H%M%S")
+    out = []
+    for line in recurrence:
+        if line.startswith("EXDATE"):
+            prefix, _, val = line.partition(":")
+            new_vals = []
+            for d in val.split(","):
+                d = d.strip()
+                date_part = d[:8]
+                new_vals.append(f"{date_part}T{new_hms}")
+            out.append(f"{prefix}:{','.join(new_vals)}")
+        else:
+            out.append(line)
+    return out
 
 
 def list_upcoming_events(days=14, calendar_id=None, user_id=None):

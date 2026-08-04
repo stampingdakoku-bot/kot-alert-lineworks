@@ -120,7 +120,7 @@
         <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="メニュー">&#9776;</button>
         <div class="nav-links">
             <a href="/" {% if request.path == '/' %}class="active"{% endif %}>今日の出勤一覧</a>
-            <a href="/shifts" {% if '/shifts' in request.path %}class="active"{% endif %}>シフト</a>
+            <a href="/shifts" {% if '/shifts' in request.path %}class="active"{% endif %}>スケジュール</a>
             <a href="/my" {% if '/my' in request.path %}class="active"{% endif %}>マイメニュー</a>
             <a href="/settings" {% if request.path in ('/settings', '/staff', '/logs', '/stores') or request.path.startswith('/staff') %}class="active"{% endif %}>設定</a>
         </div>

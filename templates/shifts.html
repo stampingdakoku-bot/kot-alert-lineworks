@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
-{% block title %}シフト一覧{% endblock %}
+{% block title %}全社スタッフスケジュール一覧{% endblock %}
 {% block content %}
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-    <h2 style="margin:0">シフト一覧 — {{ today[5:].replace('-', '/') }} から7日間</h2>
+    <h2 style="margin:0">全社スタッフスケジュール一覧 — {{ today[5:].replace('-', '/') }} から7日間</h2>
     <div style="position:relative">
         <button id="tabFilterToggle" type="button" class="btn" style="padding:8px 16px;font-size:13px">表示するタブ ▾</button>
         <div id="tabFilterPanel" class="card" style="display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;min-width:240px;padding:12px;max-height:340px;overflow-y:auto">

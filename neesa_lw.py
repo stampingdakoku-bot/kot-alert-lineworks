@@ -32,7 +32,9 @@ DEFAULT_USER = "s-tatsuya2015@works-42585"
 SHIFT_CALENDARS = [
     {"calendar_id": "b6cc3c42-23e0-462c-a5e7-ca3c272f12bc"},  # 合同会社NeeSa
     {"calendar_id": "dfe29717-15f2-4fce-92b7-2b4baa37f4a2"},  # AceCosme 発送メンバー
-    # 将来: ディアメント/@121（NeeSaより出向）はカレンダー開始時に追加
+    # ディアメント/@121専用カレンダー。calendar_id判明後、下のコメントを外して有効化。
+    # force_group指定でこのカレンダーの予定は氏名マッピング不要、全てそのグループへ。
+    # {"calendar_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", "force_group": ("ディアメント", "@121")},
 ]
 
 # 名前 → (会社, 部署) の個別マッピング（基本所属）。未登録は DEFAULT_GROUP。
@@ -258,13 +260,18 @@ def get_today_shifts(target_date=None):
             parsed["summary"] = c.get("summary", "")
             parsed["remote"] = parsed["name"] in REMOTE_NAMES
             parsed["status"] = "scheduled"
+            if cal.get("force_group"):
+                parsed["force_group"] = cal["force_group"]
             seen.setdefault(parsed["name"], parsed)
 
     # 名前 → (会社, 部署) で振り分け。@121マーカー付きは上書きで@121へ。
     # DEPT_MAP未登録(既定の発送行き)は unmapped=True で通知対象にする。
     grouped = {}
     for name, s in seen.items():
-        if s.get("at121"):
+        if s.get("force_group"):
+            key = s["force_group"]
+            s["unmapped"] = False
+        elif s.get("at121"):
             key = AT121_GROUP
             s["unmapped"] = False
         elif name in DEPT_MAP:

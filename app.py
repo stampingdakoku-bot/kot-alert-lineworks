@@ -10,7 +10,7 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev')
 
-from my_portal import my_bp  # noqa: E402 (個人メニュー: 勤怠ボタン・出勤状況一覧・スケジュール登録)
+from my_portal import my_bp, require_staff_login, _get_staff  # noqa: E402 (個人メニュー: 勤怠ボタン・出勤状況一覧・スケジュール登録)
 app.register_blueprint(my_bp)
 
 ADMIN_PASSCODE = os.getenv('ADMIN_PASSCODE', '000000')
@@ -770,10 +770,17 @@ def logs_reset():
 
 # --- Shifts ---
 @app.route('/shifts')
+@require_staff_login
 def shifts():
     import re
     import lw_api
     import requests as req_lib
+
+    viewer = _get_staff(session['staff_id'])
+    # アソビバスターズ(店舗スタッフ)にはNeeSa側の情報を見せない。
+    # ただし同じくアソビバスターズに属する商品管理部だけは例外的に閲覧可とする。
+    can_see_neesa = not (viewer and viewer.get('company') == 'アソビバスターズ'
+                          and viewer.get('dept') != '商品管理部')
 
     stores_result = supabase.table('store_calendars') \
         .select('*') \
@@ -922,6 +929,8 @@ def shifts():
             neesa_lw.DEPT_ORDER.index(kv[1]) if kv[1] in neesa_lw.DEPT_ORDER else 99,
         )
     )
+    if not can_see_neesa:
+        all_neesa_keys = []  # NeeSa側は閲覧権限がないので丸ごと非表示にする
     is_neesa_active = active_store in [f'{c}|{d}' for c, d in all_neesa_keys]
 
     neesa_by_key = {key: {d.isoformat(): [] for d in dates} for key in all_neesa_keys}

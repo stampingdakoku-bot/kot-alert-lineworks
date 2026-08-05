@@ -163,6 +163,8 @@ def apply_today(groups, now):
     scheduled = set()
     for g in groups:
         for s in g["shifts"]:
+            if s.get("is_dayoff"):
+                continue  # 終日不在系メモ(休み等)はKoT打刻判定・自動打刻オーバーレイの対象外
             scheduled.add(s["name"])
             alias = neesa_lw.KOT_NAME_ALIAS.get(s["name"])
             info = byfull.get(alias, {}) if alias else byln.get(s["name"], {})

@@ -264,11 +264,12 @@
             <tr>
                 <td style="font-size:14px">{{ s.name }}{% if s.remote %} 🏠{% endif %}</td>
                 <td style="font-size:12px;white-space:nowrap">
-                    {% if s.status == 'working' %}<span style="color:#27ae60">出勤中</span>
+                    {% if s.is_dayoff %}<span style="color:#95a5a6">休み</span>
+                    {% elif s.status == 'working' %}<span style="color:#27ae60">出勤中</span>
                     {% elif s.status == 'done' %}<span style="color:#3498db">退勤済</span>
                     {% else %}<span style="color:#95a5a6">予定</span>{% endif %}
                 </td>
-                <td style="font-size:13px;color:var(--nm-text-dim);white-space:nowrap">{% if s.start %}{{ s.start }}-{{ s.end }}{% else %}—{% endif %}</td>
+                <td style="font-size:13px;color:var(--nm-text-dim);white-space:nowrap">{% if s.note %}{{ s.note }}{% elif s.start %}{{ s.start }}-{{ s.end }}{% else %}—{% endif %}</td>
             </tr>
             {% endfor %}
             </tbody>

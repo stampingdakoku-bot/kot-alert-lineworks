@@ -476,6 +476,8 @@ def dashboard():
                     scheduled_names_today.add(stf['name'])
             for g in neesa_groups:
                 for stf in g.get('shifts', []):
+                    if stf.get('is_dayoff'):
+                        continue  # 終日不在系メモ(休み等)はリアルタイム一覧に出さない
                     scheduled_names_today.add(stf['name'])
 
             for st in raw_unified_status:

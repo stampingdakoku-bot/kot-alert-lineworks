@@ -333,6 +333,72 @@ def _applies_on_at121(comp, target_date):
     return d0 <= target_date < d1
 
 
+# 名前直後にメモ書きが続く、時間レンジ形式でない予定(例:「三鹿休み」「梅津休み(連絡可)」
+# 「三鹿中抜け 12-13時」「三鹿 16:30早退」)を認識するための、DEPT_MAP登録名一覧(長い順)。
+# 誤マッチ(例:「花園」が「花園みどり」の頭を食う)を避けるため長い名前から試す。
+_KNOWN_NAMES_BY_LENGTH = sorted(set(DEPT_MAP.keys()), key=len, reverse=True)
+
+
+def parse_shift_note(summary):
+    """parse_shift(時間レンジ形式)に一致しない「名前+メモ」形式の予定を解析する。
+    戻り値: dict(name, note, is_dayoff) / 該当なしはNone。
+    is_dayoff: メモが「休み」で始まる(終日不在)場合True。"""
+    if not summary:
+        return None
+    text = summary.strip()
+    for name in _KNOWN_NAMES_BY_LENGTH:
+        if text.startswith(name) and len(text) > len(name):
+            note = text[len(name):].strip()
+            if not note:
+                continue
+            return {"name": name, "note": note, "is_dayoff": note.startswith("休み")}
+    return None
+
+
+def _applies_on_note(comp, target_date):
+    """parse_shift_note対象イベントの該当判定。時刻あり(dateTime)は_applies_onを流用、
+    終日(date)は開始日<=target<終了日(繰り返しはRRULE展開)。_applies_on_at121と同種の
+    判定だが、at121カレンダー専用コードには触れずこちらに独立実装する。"""
+    start = comp.get("start", {}) or {}
+    if start.get("dateTime"):
+        return _applies_on(comp, target_date)
+    sd = start.get("date")
+    if not sd:
+        return False
+    try:
+        d0 = datetime.strptime(sd, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return False
+    ed = (comp.get("end", {}) or {}).get("date")
+    try:
+        d1 = datetime.strptime(ed, "%Y-%m-%d").date() if ed else d0 + timedelta(days=1)
+    except (ValueError, TypeError):
+        d1 = d0 + timedelta(days=1)
+    rec = comp.get("recurrence")
+    if rec:
+        dtstart = datetime(d0.year, d0.month, d0.day)
+        rset = _rrule.rruleset()
+        has_rule = False
+        for line in rec:
+            if line.startswith("RRULE:"):
+                try:
+                    rset.rrule(_rrule.rrulestr(line[6:], dtstart=dtstart))
+                    has_rule = True
+                except (ValueError, TypeError):
+                    pass
+            elif line.startswith("EXDATE"):
+                for d in line.split(":", 1)[-1].split(","):
+                    try:
+                        rset.exdate(datetime.strptime(d.strip().split("T")[0], "%Y%m%d"))
+                    except ValueError:
+                        pass
+        if has_rule:
+            day0 = datetime(target_date.year, target_date.month, target_date.day)
+            return any(o.date() == target_date
+                       for o in rset.between(day0, day0 + timedelta(days=1), inc=True))
+    return d0 <= target_date < d1
+
+
 def get_names_by_date_range(start_date, end_date):
     """start_date〜end_date(両端含む、date型)の日ごとの出勤者名一覧を返す。
     {date_iso: [name, ...]}。カレンダー取得はSHIFT_CALENDARS分+@121の計数回のみ
@@ -435,6 +501,26 @@ def _group_shifts_for_day(normal_with_group, at121_comps, target_date):
         if force_group:
             parsed["force_group"] = force_group
         seen.setdefault(parsed["name"], parsed)
+
+    # 時間レンジ形式に一致しない「名前+メモ」形式(休み・中抜け・早退等)を、
+    # 該当日に実シフトが無い名前に限りそのままの文言で拾う(2026-08-05)
+    for c, force_group in normal_with_group:
+        note = parse_shift_note(c.get("summary", ""))
+        if not note or note["name"] in seen:
+            continue
+        if note["name"] in EXCLUDE_NAMES or note["name"] in AT121_ONLY_NAMES:
+            continue
+        if not _applies_on_note(c, target_date):
+            continue
+        rec = {
+            "name": note["name"], "start": None, "end": None,
+            "note": note["note"], "is_dayoff": note["is_dayoff"],
+            "summary": c.get("summary", ""), "remote": note["name"] in REMOTE_NAMES,
+            "status": "scheduled",
+        }
+        if force_group:
+            rec["force_group"] = force_group
+        seen[note["name"]] = rec
 
     at121_seen = {}
     for c in at121_comps:

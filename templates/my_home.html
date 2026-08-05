@@ -17,7 +17,6 @@
     <h2 style="text-align:center">{{ staff.display_name }} さん（{{ staff.company }} / {{ staff.dept }}）</h2>
 
     <div style="margin-top:16px;text-align:center">
-        <div style="font-weight:bold;color:var(--nm-text);margin-bottom:8px">勤怠</div>
         {% if staff.kot_employee_key %}
         <p style="margin-bottom:12px">
             本日の出勤: <strong>{{ clock_in[11:16] if clock_in else '未打刻' }}</strong><br>
@@ -49,7 +48,7 @@
     <div class="stats" style="margin-top:24px">
         <a href="{{ url_for('my.schedule') }}" class="stat" style="text-decoration:none;color:inherit">
             <div class="num">📅</div>
-            <div class="label">スケジュール</div>
+            <div class="label">スケジュール登録</div>
         </a>
         <a href="{{ url_for('my.overview') }}" class="stat" style="text-decoration:none;color:inherit">
             <div class="num">👥</div>
@@ -94,9 +93,9 @@
     </div>
 
     <div style="margin-top:24px">
-        <div id="designToggle" style="cursor:pointer;font-size:14px;font-weight:bold;color:var(--nm-text);display:flex;align-items:center;gap:6px">
+        <button type="button" id="designToggle" class="btn" style="display:flex;align-items:center;gap:6px;width:100%;justify-content:center">
             <span id="designArrow">▶</span> デザイン変更
-        </div>
+        </button>
         <div id="designPanel" style="display:none;margin-top:16px">
             <div style="font-size:14px;color:var(--nm-text-dim);text-align:center;margin-bottom:16px">カラースタイルを選択してください</div>
             <form method="POST" action="{{ url_for('my.set_color') }}" id="colorForm">
@@ -127,7 +126,7 @@
         </div>
     </div>
 
-    <a href="{{ url_for('my.logout') }}" class="btn" style="margin-top:16px">ログアウト（別の人に切り替え）</a>
+    <a href="{{ url_for('my.logout') }}" class="btn" style="margin-top:16px;width:100%;text-align:center">ログアウト</a>
 </div>
 {% endblock %}
 

@@ -22,6 +22,15 @@ supabase = create_client(
 JST = timezone(timedelta(hours=9))
 
 
+@app.after_request
+def _no_cache_html(response):
+    """個人カラー等セッション依存の描画結果がブラウザ/戻る進むキャッシュで
+    古いまま表示され続けるのを防ぐ(HTMLレスポンスのみ対象)"""
+    if response.content_type and response.content_type.startswith('text/html'):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @app.before_request
 def _sync_bg_color_session():
     """マイメニューでログイン済みだがbg_colorをまだセッションに持たない

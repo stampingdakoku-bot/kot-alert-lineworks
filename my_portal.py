@@ -153,6 +153,38 @@ def _build_reminders(triggers_json):
     return reminders or None
 
 
+def _login_landing_url(staff):
+    """ログイン直後の遷移先を決める。
+    未打刻: マイメニュー(打刻用)。出勤済み・退勤済み: 本日の出勤状況。
+    出勤済みだが退勤前で、退勤予定時刻の1時間前を過ぎている場合は
+    打刻漏れ防止のためマイメニューへ戻す。"""
+    clock_in, clock_out = _today_records(staff)
+    if not clock_in:
+        return url_for('my.home')
+    if clock_out:
+        return url_for('dashboard')
+    if staff.get('kot_tenant') == 'neesa':
+        try:
+            today = datetime.now(JST).date()
+            shift_end = None
+            for g in neesa_lw.get_today_shifts(today):
+                for s in g.get('shifts', []):
+                    if s.get('name') == staff['display_name'] and s.get('end'):
+                        shift_end = s['end']
+                        break
+                if shift_end:
+                    break
+            if shift_end:
+                h, m = (int(x) for x in shift_end.split(':'))
+                now = datetime.now(JST)
+                end_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                if now >= end_dt - timedelta(hours=1):
+                    return url_for('my.home')
+        except Exception:
+            pass
+    return url_for('dashboard')
+
+
 @my_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -164,7 +196,7 @@ def login():
         session['staff_id'] = staff['staff_id']
         session['staff_name'] = staff['display_name']
         session['bg_color'] = staff.get('bg_color')
-        return redirect(url_for('my.home'))
+        return redirect(_login_landing_url(staff))
 
     grouped = {}
     for s in _get_staff_list():

@@ -86,6 +86,9 @@ ALWAYS_SHOW = [("ディアメント", "@121")]
 REMOTE_NAMES = {"梅津", "須賀", "三鹿"}  # リモート勤務者
 # ボードに出さない人（退職・別管理・表示不要など）
 EXCLUDE_NAMES = {"藤原", "佐々木", "有重", "伊藤", "曽我部", "坂本"}
+# @121異動後、通常のSHIFT_CALENDARS側に残る旧ローテーション予定を無視し、
+# @121 spa&martカレンダー側のみを正とする人(2026-08-05)
+AT121_ONLY_NAMES = {"松田"}
 
 # カレンダー表示名 → KoTフルネーム。旧姓等で姓がKoT登録名と一致しない人を、
 # フルネーム指定で打刻に紐付ける（例: カレンダー「佐藤」＝KoT「佐々木果歩」(旧姓)）。
@@ -348,7 +351,7 @@ def get_names_by_date_range(start_date, end_date):
         names = set()
         for c in normal_comps:
             parsed = parse_shift(c.get("summary", ""))
-            if not parsed or parsed["name"] in EXCLUDE_NAMES:
+            if not parsed or parsed["name"] in EXCLUDE_NAMES or parsed["name"] in AT121_ONLY_NAMES:
                 continue
             if _applies_on(c, d):
                 names.add(parsed["name"])
@@ -382,7 +385,7 @@ def get_today_shifts(target_date=None):
                 continue
             if not _applies_on(c, target_date):
                 continue
-            if parsed["name"] in EXCLUDE_NAMES:
+            if parsed["name"] in EXCLUDE_NAMES or parsed["name"] in AT121_ONLY_NAMES:
                 continue
             parsed["summary"] = c.get("summary", "")
             parsed["remote"] = parsed["name"] in REMOTE_NAMES

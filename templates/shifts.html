@@ -63,7 +63,7 @@
                             {% for shift in day.shifts %}
                             <div class="nm-surface" style="display:inline-flex;align-items:center;gap:6px;border-radius:10px;padding:8px 12px;font-size:13px">
                                 <span style="font-weight:600">{{ shift.name }}</span>
-                                <span style="color:var(--nm-text-dim);font-size:12px">{{ shift.start }}〜{{ shift.end }}</span>
+                                <span style="color:var(--nm-text-dim);font-size:12px">{% if shift.start and shift.end %}{{ shift.start }}〜{{ shift.end }}{% else %}終日{% endif %}</span>
                             </div>
                             {% endfor %}
                         </div>
@@ -118,7 +118,7 @@
                             {% for shift in day.shifts %}
                             <div class="nm-surface" style="display:inline-flex;align-items:center;gap:6px;border-radius:10px;padding:8px 12px;font-size:13px">
                                 <span style="font-weight:600">{{ shift.name }}{% if shift.remote %} 🏠{% endif %}</span>
-                                <span style="color:var(--nm-text-dim);font-size:12px">{{ shift.start }}〜{{ shift.end }}</span>
+                                <span style="color:var(--nm-text-dim);font-size:12px">{% if shift.start and shift.end %}{{ shift.start }}〜{{ shift.end }}{% else %}終日{% endif %}</span>
                             </div>
                             {% endfor %}
                         </div>

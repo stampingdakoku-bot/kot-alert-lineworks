@@ -396,10 +396,24 @@ def schedule():
         for s in _get_staff_list() if s.get('lw_account_id') and s['staff_id'] != staff['staff_id']
     ]
 
+    # マス目に表示するラベル一覧: 全社シフト予定 + 自分が登録した予定(自分の予定は
+    # AT121専用扱いの人でも一般カレンダー由来の除外対象にならないよう、
+    # get_my_events_all側から別途取得したものをここで合流させる)
+    combined_labels_by_date = {}
+    d = first_day
+    while d <= last_day:
+        d_iso = d.isoformat()
+        # 自分の予定は表示件数の上限で埋もれて消えないよう先頭に置く
+        items = [{'text': ev['summary'], 'is_leave': False, 'is_mine': True}
+                 for ev in my_events_by_date.get(d_iso, [])]
+        items += shift_labels_by_date.get(d_iso, [])
+        combined_labels_by_date[d_iso] = items
+        d += timedelta(days=1)
+
     return render_template(
         'my_schedule.html', staff=staff, today=today_str,
         weekday_ja=weekday_ja_sun, weeks=weeks,
-        names_by_date=names_by_date, shift_labels_by_date=shift_labels_by_date,
+        names_by_date=names_by_date, shift_labels_by_date=combined_labels_by_date,
         my_events_by_date=my_events_by_date,
         month_label=f'{year}年{month}月', current_month=f'{year:04d}-{month:02d}',
         prev_month=prev_month, next_month=next_month,

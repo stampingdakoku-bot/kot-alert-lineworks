@@ -19,6 +19,7 @@
 .cal-label { font-size:10px; line-height:1.4; padding:0 4px; border-radius:4px; background:rgba(63,185,135,.16);
              color:var(--nm-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
 .cal-label.leave { background:rgba(230,126,34,.22); color:#e67e22; font-weight:600; }
+.cal-label.mine { background:var(--nm-accent); color:#fff; font-weight:600; }
 .cal-label-more { font-size:10px; color:var(--nm-text-dim); padding-left:4px; }
 .cal-dot-mine { width:5px; height:5px; border-radius:50%; background:var(--nm-accent); display:inline-block; }
 </style>
@@ -46,7 +47,7 @@
             <div class="cal-daynum">{{ d.day }}</div>
             <div class="cal-labels">
                 {% for item in labels[:4] %}
-                <span class="cal-label{% if item.is_leave %} leave{% endif %}">{{ item.text }}</span>
+                <span class="cal-label{% if item.is_mine %} mine{% elif item.is_leave %} leave{% endif %}">{{ item.text }}</span>
                 {% endfor %}
                 {% if labels|length > 4 %}
                 <span class="cal-label-more">+{{ labels|length - 4 }}</span>

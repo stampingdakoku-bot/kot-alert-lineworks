@@ -12,13 +12,22 @@
                 {% for store in store_shifts %}
                 <option value="store:{{ store.store_name }}" {{ 'selected' if store.store_name == active_store }}>{{ store.store_name }}</option>
                 {% endfor %}
+                {% for cg in neesa_companies %}
+                {% if cg.company == 'アソビバスターズ' %}
+                {% for group in cg.groups %}
+                <option value="neesa:{{ group.tab_key }}" {{ 'selected' if group.tab_key == active_store }}>{{ group.dept }}</option>
+                {% endfor %}
+                {% endif %}
+                {% endfor %}
             </optgroup>
             {% for cg in neesa_companies %}
+            {% if cg.company != 'アソビバスターズ' %}
             <optgroup label="{{ cg.company }}">
                 {% for group in cg.groups %}
                 <option value="neesa:{{ group.tab_key }}" {{ 'selected' if group.tab_key == active_store }}>{{ group.dept }}</option>
                 {% endfor %}
             </optgroup>
+            {% endif %}
             {% endfor %}
         </select>
         <select id="rangeSelect" style="min-width:100px">

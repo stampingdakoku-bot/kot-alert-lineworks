@@ -65,7 +65,6 @@ DEPT_MAP = {
     "大井": ("NeeSa", "発送部"),
     "石光": ("NeeSa", "発送部"),
     "井沢": ("NeeSa", "発送部"),
-    "工藤": ("NeeSa", "発送部"),
     "西村": ("NeeSa", "発送部"),
     "矢野": ("NeeSa", "発送部"),
     "山藤": ("アソビバスターズ", "商品管理部"),
@@ -89,6 +88,9 @@ EXCLUDE_NAMES = {"藤原", "佐々木", "有重", "伊藤", "曽我部", "坂本
 # @121異動後、通常のSHIFT_CALENDARS側に残る旧ローテーション予定を無視し、
 # @121 spa&martカレンダー側のみを正とする人(2026-08-05)
 AT121_ONLY_NAMES = {"松田"}
+# パート/契約社員(自分で退勤時刻を決めるため、時間指定なし出勤予定への
+# 「打刻+9時間」自動表示の対象外とする人。それ以外は正社員(基本フレックス)扱い
+PART_TIME_NAMES = {"須賀", "杉村", "花園", "平田", "石光", "梅津"}
 
 # カレンダー表示名 → KoTフルネーム。旧姓等で姓がKoT登録名と一致しない人を、
 # フルネーム指定で打刻に紐付ける（例: カレンダー「佐藤」＝KoT「佐々木果歩」(旧姓)）。
@@ -362,6 +364,44 @@ def get_names_by_date_range(start_date, end_date):
             if _applies_on_at121(c, d):
                 names.add(p["name"])
         result[d.isoformat()] = sorted(names)
+        d += timedelta(days=1)
+    return result
+
+
+def get_shift_labels_by_date_range(start_date, end_date):
+    """月カレンダーのマス目に直接表示するための、日毎の予定ラベル一覧を返す。
+    {date_iso: [{"text": summary, "is_leave": bool}, ...]}。
+    「9-18福田」のような通常シフトだけでなく「有給 井沢」等の非シフト予定も
+    (時間レンジ形式でなくとも)summaryそのままで拾う点がget_names_by_date_rangeと異なる。"""
+    base = datetime(start_date.year, start_date.month, start_date.day, tzinfo=JST)
+    frm = base.isoformat()
+    end_base = datetime(end_date.year, end_date.month, end_date.day, tzinfo=JST)
+    unt = (end_base + timedelta(days=1)).isoformat()
+
+    normal_comps = []
+    for cal in SHIFT_CALENDARS:
+        normal_comps.extend(get_calendar_events(cal["calendar_id"], frm, unt))
+    at121_comps = get_calendar_events(AT121_CALENDAR_ID, frm, unt)
+
+    result = {}
+    d = start_date
+    while d <= end_date:
+        items = []
+        for c in normal_comps:
+            summary = (c.get("summary") or "").strip()
+            if not summary:
+                continue
+            if any(n in summary for n in EXCLUDE_NAMES) or any(n in summary for n in AT121_ONLY_NAMES):
+                continue
+            if _applies_on(c, d):
+                items.append({"text": summary, "is_leave": "有給" in summary})
+        for c in at121_comps:
+            summary = (c.get("summary") or "").strip()
+            if not summary or any(n in summary for n in EXCLUDE_NAMES):
+                continue
+            if _applies_on_at121(c, d):
+                items.append({"text": summary, "is_leave": "有給" in summary})
+        result[d.isoformat()] = items
         d += timedelta(days=1)
     return result
 

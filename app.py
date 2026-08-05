@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, date, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from dotenv import load_dotenv
 from supabase import create_client
@@ -33,15 +34,22 @@ def _no_cache_html(response):
 
 @app.before_request
 def _sync_bg_color_session():
-    """マイメニューでログイン済みだがbg_colorをまだセッションに持たない
-    （機能追加前からのセッション等）場合、DBから読み込んで補完する"""
-    if session.get('staff_id') and 'bg_color' not in session:
+    """ログイン中はDBから直接bg_colorを読み込みsessionに反映する。
+    (以前は「sessionに無い時だけ補完」だったが、何らかの理由でsession側が古いまま
+    更新されないケースがあり、マイメニュー以外のページに新しい色が反映されない
+    不具合の原因となっていたため、最新化する方式に変更した。ただし毎リクエストDBに
+    問い合わせると重くなるため、10秒間はキャッシュを使い回す)"""
+    if session.get('staff_id'):
+        now = datetime.now().timestamp()
+        if now - session.get('bg_synced_at', 0) < 10:
+            return
         try:
             result = supabase.table('staff_directory').select('bg_color') \
                 .eq('staff_id', session['staff_id']).limit(1).execute()
             session['bg_color'] = result.data[0].get('bg_color') if result.data else None
+            session['bg_synced_at'] = now
         except Exception:
-            session['bg_color'] = None
+            pass
 
 # 異体字正規化マップ（KoT登録名 → カレンダー表記）
 KANJI_VARIANTS = {
@@ -407,33 +415,41 @@ def dashboard():
         ft = a['flow_type']
         summary[ft] = summary.get(ft, 0) + 1
 
-    # Store cards with shift/attendance data
-    try:
-        store_cards, all_emp_data = _get_store_shifts_and_attendance(today)
-    except Exception as e:
-        store_cards = []
-        all_emp_data = supabase.table('employees') \
-            .select('*, mappings(lw_account_id)') \
-            .order('employee_code') \
-            .execute().data
+    # Store cards / NeeSaカードは互いに独立した外部API呼び出しのため、
+    # 直列実行だと遅いのでスレッドで並行実行する(体感速度改善)
+    def _fetch_store_cards():
+        try:
+            return _get_store_shifts_and_attendance(today)
+        except Exception:
+            emp_data = supabase.table('employees') \
+                .select('*, mappings(lw_account_id)') \
+                .order('employee_code') \
+                .execute().data
+            return [], emp_data
 
-    # NeeSa/アソビバ本社/@121 カード(/boardと同じデータをダッシュボードにも表示)
-    # シフト予定(登録シフト)自体は日付を問わず表示する。KoTの実打刻オーバーレイは
-    # 未来日には存在しない(まだ打刻されていない)ため、当日・過去日のみ適用する。
-    neesa_groups = []
-    try:
-        import neesa_lw
-        import neesa_kot
-        now_jst = datetime.now(JST)
-        neesa_groups = neesa_lw.get_today_shifts(selected)
-        for g in neesa_groups:
-            for s in g['shifts']:
-                s.setdefault('status', 'scheduled')
-        if not is_future:
-            neesa_groups = neesa_kot.apply_today(neesa_groups, now_jst)
-    except Exception as e:
-        app.logger.warning('dashboard NeeSaカード取得失敗: %s', e)
-        neesa_groups = []
+    def _fetch_neesa_groups():
+        # シフト予定(登録シフト)自体は日付を問わず表示する。KoTの実打刻オーバーレイは
+        # 未来日には存在しない(まだ打刻されていない)ため、当日・過去日のみ適用する。
+        try:
+            import neesa_lw as _neesa_lw
+            import neesa_kot as _neesa_kot
+            now_jst = datetime.now(JST)
+            groups = _neesa_lw.get_today_shifts(selected)
+            for g in groups:
+                for s in g['shifts']:
+                    s.setdefault('status', 'scheduled')
+            if not is_future:
+                groups = _neesa_kot.apply_today(groups, now_jst)
+            return groups
+        except Exception as e:
+            app.logger.warning('dashboard NeeSaカード取得失敗: %s', e)
+            return []
+
+    with ThreadPoolExecutor(max_workers=2) as _ex:
+        _store_future = _ex.submit(_fetch_store_cards)
+        _neesa_future = _ex.submit(_fetch_neesa_groups)
+        store_cards, all_emp_data = _store_future.result()
+        neesa_groups = _neesa_future.result()
 
     # ===== リアルタイム出勤状況(本体/NeeSa両テナント統合。/my/overviewと同じロジックを無認証で公開) =====
     unified_grouped = {}
@@ -442,7 +458,18 @@ def dashboard():
         try:
             import attendance_unified
             import neesa_lw
+            # 本日出勤予定のある人だけに絞る(店舗シフト予定+NeeSaシフト予定の名前集合)
+            scheduled_names_today = set()
+            for card in store_cards:
+                for stf in card.get('staff_scheduled', []):
+                    scheduled_names_today.add(stf['name'])
+            for g in neesa_groups:
+                for stf in g.get('shifts', []):
+                    scheduled_names_today.add(stf['name'])
+
             for st in attendance_unified.get_unified_status():
+                if st['display_name'] not in scheduled_names_today:
+                    continue
                 key = f"{st['company']}|{st['dept']}"
                 unified_grouped.setdefault(key, []).append(st)
             unified_group_list = sorted(

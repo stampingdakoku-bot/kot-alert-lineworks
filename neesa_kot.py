@@ -166,6 +166,14 @@ def apply_today(groups, now):
                 s["status"] = _schedule_status(s.get("start"), s.get("end"), now)
             else:
                 s["status"] = _status(info)
+            # 時間指定なしの出勤予定(有給等でない単なる「出勤」表記)で、正社員(基本
+            # フレックス)が実際に打刻した場合は「打刻時刻〜+9時間」を勤務時間帯として
+            # 表示する。パート/契約社員(自分で退勤時刻を決める)は対象外。
+            if not s.get("start") and s["name"] not in neesa_lw.PART_TIME_NAMES and s.get("clock_in"):
+                ci = s["clock_in"]
+                end_dt = ci + timedelta(hours=9)
+                s["start"] = f"{ci.hour}:{ci.minute:02d}"
+                s["end"] = f"{end_dt.hour}:{end_dt.minute:02d}"
 
     gmap = {(g["company"], g["dept"]): g for g in groups}
 

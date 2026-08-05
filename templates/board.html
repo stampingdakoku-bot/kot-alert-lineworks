@@ -33,15 +33,14 @@
 
     /* ===== トップバー ===== */
     nav {
-      background: var(--nm-bg); padding: 12px 24px;
+      background: var(--nm-text); padding: 12px 24px;
       display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-      box-shadow: 0 6px 12px rgba(163,177,198,.4), 0 1px 0 rgba(255,255,255,.7) inset;
+      box-shadow: 0 6px 12px rgba(0,0,0,.3);
     }
-    nav .brand { font-weight: bold; font-size: clamp(16px, 2.4vw, 20px); color: var(--nm-text); }
+    nav .brand { font-weight: bold; font-size: clamp(16px, 2.4vw, 20px); color: var(--nm-bg); }
     nav .count {
-      font-size: clamp(12px, 1.7vw, 15px); font-weight: 600; color: var(--nm-text);
-      background: var(--nm-bg); padding: 4px 14px; border-radius: 12px;
-      box-shadow: inset 2px 2px 4px var(--nm-shadow-dark), inset -2px -2px 4px var(--nm-shadow-light);
+      font-size: clamp(12px, 1.7vw, 15px); font-weight: 600; color: var(--nm-bg);
+      background: rgba(255,255,255,.16); padding: 4px 14px; border-radius: 12px;
     }
     nav .trecole-link {
       margin-left: auto; font-size: clamp(12px, 1.6vw, 14px);

@@ -29,14 +29,15 @@
         a { color: inherit; }
         :focus-visible { outline: 2px solid var(--nm-accent); outline-offset: 2px; }
 
-        nav { background: var(--nm-bg); color: var(--nm-text); padding: 14px 24px; display: flex; align-items: center; gap: 24px;
-              box-shadow: 0 6px 12px rgba(163,177,198,.4), 0 1px 0 rgba(255,255,255,.7) inset; position: relative; z-index: 10; }
-        nav a { color: var(--nm-text); text-decoration: none; font-size: 14px; padding: 8px 14px; border-radius: 12px; transition: box-shadow .15s ease; }
-        nav a:hover, nav a.active { box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
-        nav .brand { font-weight: bold; font-size: 16px; color: var(--nm-text); }
+        nav { background: var(--nm-text); color: var(--nm-bg); padding: 14px 24px; display: flex; align-items: center; gap: 24px;
+              box-shadow: 0 6px 12px rgba(0,0,0,.3); position: relative; z-index: 10; }
+        nav a { color: var(--nm-bg); text-decoration: none; font-size: 14px; padding: 8px 14px; border-radius: 12px;
+                opacity: .8; transition: opacity .15s ease, background .15s ease; }
+        nav a:hover, nav a.active { opacity: 1; background: rgba(255,255,255,.16); }
+        nav .brand { font-weight: bold; font-size: 16px; color: var(--nm-bg); opacity: 1; }
         .nav-links { display: flex; align-items: center; gap: 4px; flex: 1; }
         .nav-links .logout { margin-left: auto; }
-        .hamburger { display: none; background: none; border: none; color: var(--nm-text); font-size: 24px; cursor: pointer; padding: 8px; min-width: 44px; min-height: 44px; border-radius: 12px; }
+        .hamburger { display: none; background: none; border: none; color: var(--nm-bg); font-size: 24px; cursor: pointer; padding: 8px; min-width: 44px; min-height: 44px; border-radius: 12px; }
         .hamburger:hover { box-shadow: inset 3px 3px 6px var(--nm-shadow-dark), inset -3px -3px 6px var(--nm-shadow-light); }
 
         .container { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
@@ -98,11 +99,11 @@
         @media (max-width: 768px) {
             nav { padding: 8px 16px; gap: 0; justify-content: space-between; }
             .hamburger { display: flex; align-items: center; justify-content: center; }
-            .nav-links { display: none; flex-direction: column; position: absolute; top: 52px; left: 0; right: 0; background: var(--nm-bg); padding: 8px 0; z-index: 50;
-                         gap: 0; box-shadow: 0 6px 12px rgba(163,177,198,.4); }
+            .nav-links { display: none; flex-direction: column; position: absolute; top: 52px; left: 0; right: 0; background: var(--nm-text); padding: 8px 0; z-index: 50;
+                         gap: 0; box-shadow: 0 6px 12px rgba(0,0,0,.3); }
             .nav-links.open { display: flex; }
             .nav-links a { padding: 14px 24px; width: 100%; border-radius: 0; font-size: 15px; }
-            .nav-links .logout { margin-left: 0; box-shadow: inset 0 1px 0 rgba(163,177,198,.3); }
+            .nav-links .logout { margin-left: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
             .container { margin: 16px auto; padding: 0 12px; }
             .card { padding: 16px; }
             .card h2 { font-size: 16px; }

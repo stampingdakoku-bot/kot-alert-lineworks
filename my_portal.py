@@ -245,10 +245,18 @@ def home():
     unread_notice_count = _unread_notice_count(staff['staff_id'])
     notifications = _my_notifications(staff)
     _mark_notices_read(staff['staff_id'])
+    marquee_text = ''
+    try:
+        settings_row = supabase.table('alert_settings').select('dashboard_marquee_text').eq('id', 1).execute()
+        if settings_row.data:
+            marquee_text = settings_row.data[0].get('dashboard_marquee_text') or ''
+    except Exception:
+        marquee_text = ''
     return render_template('my_home.html', staff=staff, clock_in=clock_in, clock_out=clock_out,
                            next_shift_date=next_shift_date, notifications=notifications,
                            unread_notice_count=unread_notice_count,
                            can_send_notice=_can_send_notice(staff),
+                           marquee_text=marquee_text,
                            flow_labels=FLOW_LABELS)
 
 

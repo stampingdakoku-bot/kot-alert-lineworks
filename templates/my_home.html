@@ -6,6 +6,25 @@
 {% if _bg|length == 2 %}
 :root { --nm-bg: {{ _bg[1] }}; --nm-text: {{ _bg[0] }}; }
 {% endif %}
+.marquee-wrap {
+    position: relative; overflow: hidden; border-radius: var(--nm-radius); margin: 16px 0; padding: 12px 0;
+    background: var(--nm-bg); box-shadow: -6px -6px 12px var(--nm-shadow-light), 6px 6px 12px var(--nm-shadow-dark);
+}
+.marquee-track { display: flex; width: max-content; animation: marquee-scroll 22s linear infinite; }
+.marquee-wrap:hover .marquee-track { animation-play-state: paused; }
+.marquee-item { padding: 0 48px; white-space: nowrap; font-size: 14px; font-weight: 600; color: var(--nm-text); }
+.marquee-wrap::before, .marquee-wrap::after {
+    content: ""; position: absolute; top: 0; bottom: 0; width: 56px; z-index: 2; pointer-events: none;
+}
+.marquee-wrap::before { left: 0; background: linear-gradient(to right, var(--nm-bg), transparent); }
+.marquee-wrap::after { right: 0; background: linear-gradient(to left, var(--nm-bg), transparent); }
+@keyframes marquee-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .marquee-track { animation: none; }
+}
 </style>
 <div class="card">
     {% if unread_notice_count and unread_notice_count > 0 %}
@@ -15,6 +34,15 @@
     </a>
     {% endif %}
     <h2 style="text-align:center">{{ staff.display_name }} さん（{{ staff.company }} / {{ staff.dept }}）</h2>
+
+    {% if marquee_text %}
+    <div class="marquee-wrap">
+        <div class="marquee-track">
+            <span class="marquee-item">📢 {{ marquee_text }}</span>
+            <span class="marquee-item">📢 {{ marquee_text }}</span>
+        </div>
+    </div>
+    {% endif %}
 
     <div style="margin-top:16px;text-align:center">
         {% if staff.kot_employee_key %}

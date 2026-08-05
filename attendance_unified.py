@@ -6,6 +6,7 @@ kot_write.fetch_all_records(既存KOT_WRITE_TOKEN/NEESA_KOT_WRITE_TOKEN経由の
 """
 import logging
 from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 import kot_write
 from db_supabase import supabase
@@ -24,10 +25,11 @@ def get_unified_status(date_str=None):
     result = supabase.table("staff_directory").select("*").eq("is_active", True).execute()
     staff_rows = result.data
 
-    by_tenant = {
-        "main": kot_write.fetch_all_records("main", date_str),
-        "neesa": kot_write.fetch_all_records("neesa", date_str),
-    }
+    # main/neesa双方のKoT取得は互いに独立しているため並行実行する
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        main_future = ex.submit(kot_write.fetch_all_records, "main", date_str)
+        neesa_future = ex.submit(kot_write.fetch_all_records, "neesa", date_str)
+        by_tenant = {"main": main_future.result(), "neesa": neesa_future.result()}
 
     out = []
     for s in staff_rows:

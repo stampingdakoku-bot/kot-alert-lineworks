@@ -355,6 +355,7 @@ def schedule():
     first_day = date(year, month, 1)
     last_day = date(year, month, _calendar_mod.monthrange(year, month)[1])
     names_by_date = neesa_lw.get_names_by_date_range(first_day, last_day)
+    shift_labels_by_date = neesa_lw.get_shift_labels_by_date_range(first_day, last_day)
     my_events_by_date = lw_calendar_write.get_my_events(staff['display_name'], first_day, last_day)
 
     weekday_ja_sun = ['日', '月', '火', '水', '木', '金', '土']
@@ -382,7 +383,8 @@ def schedule():
     return render_template(
         'my_schedule.html', staff=staff, today=today_str,
         weekday_ja=weekday_ja_sun, weeks=weeks,
-        names_by_date=names_by_date, my_events_by_date=my_events_by_date,
+        names_by_date=names_by_date, shift_labels_by_date=shift_labels_by_date,
+        my_events_by_date=my_events_by_date,
         month_label=f'{year}年{month}月', current_month=f'{year:04d}-{month:02d}',
         prev_month=prev_month, next_month=next_month,
         staff_options_json=json.dumps(staff_options, ensure_ascii=False),

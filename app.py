@@ -445,18 +445,29 @@ def dashboard():
             app.logger.warning('dashboard NeeSaカード取得失敗: %s', e)
             return []
 
-    with ThreadPoolExecutor(max_workers=2) as _ex:
+    def _fetch_unified_status():
+        if not is_today:
+            return []
+        try:
+            import attendance_unified as _attendance_unified
+            return _attendance_unified.get_unified_status()
+        except Exception as e:
+            app.logger.warning('リアルタイム出勤状況取得失敗: %s', e)
+            return []
+
+    with ThreadPoolExecutor(max_workers=3) as _ex:
         _store_future = _ex.submit(_fetch_store_cards)
         _neesa_future = _ex.submit(_fetch_neesa_groups)
+        _unified_future = _ex.submit(_fetch_unified_status)
         store_cards, all_emp_data = _store_future.result()
         neesa_groups = _neesa_future.result()
+        raw_unified_status = _unified_future.result()
 
     # ===== リアルタイム出勤状況(本体/NeeSa両テナント統合。/my/overviewと同じロジックを無認証で公開) =====
     unified_grouped = {}
     unified_group_list = []
     if is_today:
         try:
-            import attendance_unified
             import neesa_lw
             # 本日出勤予定のある人だけに絞る(店舗シフト予定+NeeSaシフト予定の名前集合)
             scheduled_names_today = set()
@@ -467,7 +478,7 @@ def dashboard():
                 for stf in g.get('shifts', []):
                     scheduled_names_today.add(stf['name'])
 
-            for st in attendance_unified.get_unified_status():
+            for st in raw_unified_status:
                 if st['display_name'] not in scheduled_names_today:
                     continue
                 key = f"{st['company']}|{st['dept']}"
@@ -915,12 +926,15 @@ def shifts():
 
     neesa_by_key = {key: {d.isoformat(): [] for d in dates} for key in all_neesa_keys}
     if is_neesa_active:
-        # アクティブなタブがNeeSa側の時のみ実際にカレンダーを取得
+        # アクティブなタブがNeeSa側の時のみ実際にカレンダーを取得。
+        # 日数分の往復を避けるため、範囲をまとめて1回で取得する
+        shifts_by_date = neesa_lw.get_shifts_grouped_by_date_range(dates[0], dates[-1])
         for d in dates:
-            for g in neesa_lw.get_today_shifts(d):
+            d_str = d.isoformat()
+            for g in shifts_by_date.get(d_str, []):
                 key = (g['company'], g['dept'])
                 if key in neesa_by_key:
-                    neesa_by_key[key][d.isoformat()] = sorted(g['shifts'], key=lambda x: x.get('start') or '')
+                    neesa_by_key[key][d_str] = sorted(g['shifts'], key=lambda x: x.get('start') or '')
 
     neesa_shifts = []
     for company, dept in all_neesa_keys:

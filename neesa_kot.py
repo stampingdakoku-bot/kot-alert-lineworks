@@ -7,6 +7,7 @@ import os
 import logging
 import requests
 from datetime import timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 import kot_api      # parse_timerecords_for_employee 流用 + トレコレKoT(宮崎)取得
 import neesa_lw     # マッピング/設定
@@ -134,9 +135,14 @@ def _trecole_status(names, date_str):
 def apply_today(groups, now):
     """当日のみ: KoT打刻で各シフトのstatusを設定し、打刻のみ者・宮崎(トレコレ)を追加。"""
     date_str = now.strftime("%Y-%m-%d")
-    emps = get_employees()
-    tr = _get("/daily-workings/timerecord/" + date_str)
-    dwd = _get("/daily-workings/" + date_str)
+    # 3つとも互いに独立した読み取りなので並行実行する(体感速度改善)
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        emps_future = ex.submit(get_employees)
+        tr_future = ex.submit(_get, "/daily-workings/timerecord/" + date_str)
+        dwd_future = ex.submit(_get, "/daily-workings/" + date_str)
+        emps = emps_future.result()
+        tr = tr_future.result()
+        dwd = dwd_future.result()
     # KoT取得失敗（禁止時間帯403等）時は色付けせず予定表示のまま返す
     if not emps or tr is None:
         logger.warning("NeeSa KoT未取得のため色付けスキップ（予定表示）")

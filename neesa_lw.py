@@ -406,37 +406,38 @@ def get_shift_labels_by_date_range(start_date, end_date):
     return result
 
 
-def get_today_shifts(target_date=None):
-    """全シフトカレンダーから当日のシフトを取得し、名前→部署マッピングで
-    会社/部署ごとにまとめる。繰り返しはRRULE展開で当日分のみ・名前で重複排除。
-    返り値: [{company, dept, shifts:[{name,start,end,summary,remote,status}]}]"""
-    if target_date is None:
-        target_date = datetime.now(JST).date()
-    base = datetime(target_date.year, target_date.month, target_date.day, tzinfo=JST)
-    frm = base.isoformat()
-    unt = (base + timedelta(days=1)).isoformat()
-
-    # 全カレンダーからシフトを集約（名前で重複排除）
-    seen = {}
+def _fetch_normal_and_at121(frm, unt):
+    """SHIFT_CALENDARS全部+@121を一括取得。[(comp, force_group), ...] と @121のcomp一覧を返す。
+    複数日分をまとめて1回で取得するための下請け(get_today_shifts/範囲版で共用)。"""
+    normal_with_group = []
     for cal in SHIFT_CALENDARS:
         for c in get_calendar_events(cal["calendar_id"], frm, unt):
-            parsed = parse_shift(c.get("summary", ""))
-            if not parsed:
-                continue
-            if not _applies_on(c, target_date):
-                continue
-            if parsed["name"] in EXCLUDE_NAMES or parsed["name"] in AT121_ONLY_NAMES:
-                continue
-            parsed["summary"] = c.get("summary", "")
-            parsed["remote"] = parsed["name"] in REMOTE_NAMES
-            parsed["status"] = "scheduled"
-            if cal.get("force_group"):
-                parsed["force_group"] = cal["force_group"]
-            seen.setdefault(parsed["name"], parsed)
+            normal_with_group.append((c, cal.get("force_group")))
+    at121_comps = get_calendar_events(AT121_CALENDAR_ID, frm, unt)
+    return normal_with_group, at121_comps
 
-    # @121カレンダー（専用パーサ。氏名マッピング不要で全員@121へ）
+
+def _group_shifts_for_day(normal_with_group, at121_comps, target_date):
+    """事前取得済みのイベント一覧から、target_date一日分の会社/部署グループを組み立てる
+    (get_today_shiftsの本体ロジック。複数日分をループする際に取得を使い回すため分離)。"""
+    seen = {}
+    for c, force_group in normal_with_group:
+        parsed = parse_shift(c.get("summary", ""))
+        if not parsed:
+            continue
+        if not _applies_on(c, target_date):
+            continue
+        if parsed["name"] in EXCLUDE_NAMES or parsed["name"] in AT121_ONLY_NAMES:
+            continue
+        parsed["summary"] = c.get("summary", "")
+        parsed["remote"] = parsed["name"] in REMOTE_NAMES
+        parsed["status"] = "scheduled"
+        if force_group:
+            parsed["force_group"] = force_group
+        seen.setdefault(parsed["name"], parsed)
+
     at121_seen = {}
-    for c in get_calendar_events(AT121_CALENDAR_ID, frm, unt):
+    for c in at121_comps:
         p = parse_at121(c)
         if not p or not _applies_on_at121(c, target_date):
             continue
@@ -448,9 +449,6 @@ def get_today_shifts(target_date=None):
         p["unmapped"] = False
         at121_seen.setdefault(p["name"], p)
 
-    # 名前 → (会社, 部署) で振り分け。@121マーカー付きは上書きで@121へ。
-    # DEPT_MAP未登録(既定の発送行き)は unmapped=True で通知対象にする。
-    # @121カレンダーに同名が出ている場合はそちらを優先し、通常部署側からは除外(dedup)。
     grouped = {}
     for name, s in seen.items():
         if name in at121_seen:
@@ -470,7 +468,6 @@ def get_today_shifts(target_date=None):
         grouped.setdefault(key, []).append(s)
     for name, s in at121_seen.items():
         grouped.setdefault(AT121_GROUP, []).append(s)
-    # 対象ゼロでも常時表示する枠を確保
     for cd in ALWAYS_SHOW:
         grouped.setdefault(cd, [])
 
@@ -488,6 +485,37 @@ def get_today_shifts(target_date=None):
             "shifts": sorted(shifts, key=lambda s: (s.get("start") is None, s.get("start") or "")),
         })
     return groups
+
+
+def get_today_shifts(target_date=None):
+    """全シフトカレンダーから当日のシフトを取得し、名前→部署マッピングで
+    会社/部署ごとにまとめる。繰り返しはRRULE展開で当日分のみ・名前で重複排除。
+    返り値: [{company, dept, shifts:[{name,start,end,summary,remote,status}]}]"""
+    if target_date is None:
+        target_date = datetime.now(JST).date()
+    base = datetime(target_date.year, target_date.month, target_date.day, tzinfo=JST)
+    frm = base.isoformat()
+    unt = (base + timedelta(days=1)).isoformat()
+    normal_with_group, at121_comps = _fetch_normal_and_at121(frm, unt)
+    return _group_shifts_for_day(normal_with_group, at121_comps, target_date)
+
+
+def get_shifts_grouped_by_date_range(start_date, end_date):
+    """get_today_shiftsの複数日版。カレンダー取得はSHIFT_CALENDARS分+@121の計数回のみ
+    (日数分の取得を行わない)。返り値: {date_iso: [{company, dept, shifts:[...]}, ...]}
+    /shiftsの週・月表示で日数分のAPI往復が発生し重くなっていたのを解消するために追加。"""
+    base = datetime(start_date.year, start_date.month, start_date.day, tzinfo=JST)
+    frm = base.isoformat()
+    end_base = datetime(end_date.year, end_date.month, end_date.day, tzinfo=JST)
+    unt = (end_base + timedelta(days=1)).isoformat()
+    normal_with_group, at121_comps = _fetch_normal_and_at121(frm, unt)
+
+    result = {}
+    d = start_date
+    while d <= end_date:
+        result[d.isoformat()] = _group_shifts_for_day(normal_with_group, at121_comps, d)
+        d += timedelta(days=1)
+    return result
 
 
 if __name__ == "__main__":

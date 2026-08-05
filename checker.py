@@ -631,9 +631,6 @@ def send_daily_report(all_emps=None, yesterday_str=None):
 
     lines.append("")
     lines.append("⚙️ 申請漏れがある場合はKING OF TIMEより修正を行ってください。")
-    lines.append("")
-    lines.append("▶ 管理画面")
-    lines.append("http://133.125.93.39/")
 
     if reminder_lines:
         lines = reminder_lines + [""] + lines

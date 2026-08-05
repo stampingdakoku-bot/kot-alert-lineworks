@@ -404,6 +404,12 @@
                 window.location.href = '?date=' + this.value + '&tab=' + (window.currentDashTab || '{{ active_tab }}');
             }
         });
+        // 日付欄を押したら(ピッカーは開かず)常に当日に戻る
+        dateNav.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            this.blur();
+            window.location.href = '?date={{ today_actual }}&tab=' + (window.currentDashTab || '{{ active_tab }}');
+        });
     }
 
     // 本日の出勤状況見出し横のリアルタイム時計(1秒ごと)

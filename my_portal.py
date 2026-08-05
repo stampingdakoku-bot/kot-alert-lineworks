@@ -356,7 +356,7 @@ def schedule():
     last_day = date(year, month, _calendar_mod.monthrange(year, month)[1])
     names_by_date = neesa_lw.get_names_by_date_range(first_day, last_day)
     shift_labels_by_date = neesa_lw.get_shift_labels_by_date_range(first_day, last_day)
-    my_events_by_date = lw_calendar_write.get_my_events(staff['display_name'], first_day, last_day)
+    my_events_by_date = lw_calendar_write.get_my_events_all(staff['display_name'], first_day, last_day)
 
     weekday_ja_sun = ['日', '月', '火', '水', '木', '金', '土']
     start_offset = (first_day.weekday() + 1) % 7  # 月曜=0 → 日曜=0起点に変換
@@ -404,6 +404,7 @@ def schedule_edit(event_id):
     start_time = request.form.get('start_time')
     end_time = request.form.get('end_time')
     recurrence_json = request.form.get('recurrence') or '[]'
+    calendar_id = request.form.get('calendar_id') or None
     month_ctx = date_str[:7] if date_str else None
     next_url = request.form.get('next') or ''
     fallback = next_url if next_url.startswith('/') else url_for('my.schedule', month=month_ctx)
@@ -431,7 +432,7 @@ def schedule_edit(event_id):
     reminders = _build_reminders(request.form.get('reminders'))
     ok, detail = lw_calendar_write.update_event(
         event_id, summary, start_dt, end_dt, recurrence=recurrence or None,
-        attendees=attendees, reminders=reminders)
+        attendees=attendees, reminders=reminders, calendar_id=calendar_id)
     if ok:
         flash('予定を更新しました', 'success')
     else:
@@ -448,6 +449,7 @@ def schedule_delete(event_id):
     series_end_str = request.form.get('series_end') or ''
     summary = request.form.get('summary') or ''
     recurrence_json = request.form.get('recurrence') or '[]'
+    calendar_id = request.form.get('calendar_id') or None
     month_ctx = (occurrence_date_str or series_start_str)[:7] or None
     next_url = request.form.get('next') or ''
     fallback = next_url if next_url.startswith('/') else url_for('my.schedule', month=month_ctx)
@@ -458,7 +460,7 @@ def schedule_delete(event_id):
         recurrence = []
 
     if mode == 'all' or not recurrence:
-        ok, detail = lw_calendar_write.delete_event(event_id)
+        ok, detail = lw_calendar_write.delete_event(event_id, calendar_id=calendar_id)
     else:
         try:
             series_start = datetime.fromisoformat(series_start_str)
@@ -474,7 +476,7 @@ def schedule_delete(event_id):
         else:  # following
             new_recurrence = lw_calendar_write.truncate_recurrence_before(recurrence, occ_date)
         ok, detail = lw_calendar_write.update_event(
-            event_id, summary, series_start, series_end, recurrence=new_recurrence)
+            event_id, summary, series_start, series_end, recurrence=new_recurrence, calendar_id=calendar_id)
 
     if ok:
         flash('予定を削除しました', 'success')

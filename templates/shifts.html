@@ -8,6 +8,7 @@
     <h2 style="margin:0">全社スタッフスケジュール一覧</h2>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
         <select id="deptSelect" style="min-width:200px">
+            <option value="" {{ 'selected' if not active_store }}>店舗・部署を選択</option>
             <optgroup label="アソビバスターズ">
                 {% for store in store_shifts %}
                 <option value="store:{{ store.store_name }}" {{ 'selected' if store.store_name == active_store }}>{{ store.store_name }}</option>
@@ -37,6 +38,12 @@
         </select>
     </div>
 </div>
+
+{% if not active_store %}
+<div class="card" style="text-align:center;color:var(--nm-text-dim);padding:40px">
+    店舗または部署を選択すると表示されます
+</div>
+{% endif %}
 
 {# ===== シフト表示: 店舗 ===== #}
 {% for store in store_shifts %}
@@ -177,6 +184,7 @@
         <form id="myShiftForm" method="POST" action="">
             <input type="hidden" name="date" id="ms_date">
             <input type="hidden" name="recurrence" id="ms_recurrence" value="[]">
+            <input type="hidden" name="calendar_id" id="ms_calendar_id">
             <input type="hidden" name="next" value="/shifts?store={{ active_store }}&range={{ range_param }}">
             <div class="form-row"><label>内容</label><input type="text" name="title" id="ms_title" required style="flex:1"></div>
             <div class="form-row"><label>開始時刻</label><input type="time" name="start_time" id="ms_start" required></div>
@@ -210,6 +218,7 @@
     <input type="hidden" name="series_end" id="msd_series_end">
     <input type="hidden" name="summary" id="msd_summary">
     <input type="hidden" name="recurrence" id="msd_recurrence">
+    <input type="hidden" name="calendar_id" id="msd_calendar_id">
 </form>
 
 {% endblock %}
@@ -225,6 +234,7 @@ var currentMyEvent = null;
     if (deptSelect) {
         deptSelect.addEventListener('change', function() {
             var val = this.value; // "store:フジグラン" or "neesa:NeeSa|発送部"
+            if (!val) { window.location.href = '?'; return; }
             var key = val.slice(val.indexOf(':') + 1);
             window.location.href = '?store=' + encodeURIComponent(key) + '&range=' + document.getElementById('rangeSelect').value;
         });
@@ -266,6 +276,7 @@ function openMyShiftModal(dateIso) {
     document.getElementById('ms_start').value = ev.start_time;
     document.getElementById('ms_end').value = ev.end_time;
     document.getElementById('ms_recurrence').value = JSON.stringify(ev.recurrence || []);
+    document.getElementById('ms_calendar_id').value = ev.calendar_id || '';
     document.getElementById('ms_start').readOnly = ev.is_recurring;
     document.getElementById('ms_end').readOnly = ev.is_recurring;
     document.getElementById('ms_recurringNote').style.display = ev.is_recurring ? 'block' : 'none';
@@ -296,6 +307,7 @@ function fillMyShiftDeleteForm(ev, mode) {
     document.getElementById('msd_series_end').value = ev.series_end;
     document.getElementById('msd_summary').value = ev.summary;
     document.getElementById('msd_recurrence').value = JSON.stringify(ev.recurrence || []);
+    document.getElementById('msd_calendar_id').value = ev.calendar_id || '';
     document.getElementById('myShiftDeleteForm').action = '/my/schedule/event/' + ev.event_id + '/delete';
 }
 

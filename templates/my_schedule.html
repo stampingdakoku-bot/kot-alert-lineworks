@@ -68,6 +68,7 @@
         <form id="eventForm" method="POST" action="{{ url_for('my.schedule') }}">
             <input type="hidden" name="date" id="f_date">
             <input type="hidden" name="recurrence" id="f_recurrence" value="[]">
+            <input type="hidden" name="calendar_id" id="f_calendar_id">
             <div class="form-row"><label>日付</label><input type="text" id="f_date_display" disabled style="flex:1"></div>
             <div class="form-row"><label>内容</label><input type="text" name="title" id="f_title" placeholder="例: 外出" required style="flex:1"></div>
             <div class="form-row"><label>開始時刻</label><input type="time" name="start_time" id="f_start" required></div>
@@ -138,6 +139,7 @@
     <input type="hidden" name="series_end" id="del_series_end">
     <input type="hidden" name="summary" id="del_summary">
     <input type="hidden" name="recurrence" id="del_recurrence">
+    <input type="hidden" name="calendar_id" id="del_calendar_id">
 </form>
 {% endblock %}
 
@@ -310,6 +312,7 @@ function resetForm() {
     document.getElementById('f_date').value = currentDate;
     document.getElementById('f_date_display').value = currentDate;
     document.getElementById('f_recurrence').value = '[]';
+    document.getElementById('f_calendar_id').value = '';
     document.getElementById('repeatSection').style.display = '';
     document.getElementById('repeatDaysWrap').style.display = 'none';
     document.getElementById('f_cancel_edit').style.display = 'none';
@@ -337,6 +340,7 @@ function editEventAt(idx) {
     document.getElementById('f_start').value = ev.start_time;
     document.getElementById('f_end').value = ev.end_time;
     document.getElementById('f_recurrence').value = JSON.stringify(ev.recurrence || []);
+    document.getElementById('f_calendar_id').value = ev.calendar_id || '';
     document.getElementById('repeatSection').style.display = 'none';
     document.getElementById('f_cancel_edit').style.display = 'inline-block';
     // 繰り返し予定は時刻を変更すると既存の「この予定だけ削除」設定が失われるため、
@@ -375,6 +379,7 @@ function fillDeleteForm(ev, mode) {
     document.getElementById('del_series_end').value = ev.series_end;
     document.getElementById('del_summary').value = ev.summary;
     document.getElementById('del_recurrence').value = JSON.stringify(ev.recurrence || []);
+    document.getElementById('del_calendar_id').value = ev.calendar_id || '';
     document.getElementById('deleteForm').action = '/my/schedule/event/' + ev.event_id + '/delete';
 }
 

@@ -813,8 +813,8 @@ def shifts():
     today_str = today.isoformat()
     end_date = dates[-1]
 
-    # Default to first store tab
-    active_store = request.args.get('store', stores[0]['store_name'] if stores else '')
+    # 何も選択していない状態では何も表示しない(店舗・部署を選ぶまでは空)
+    active_store = request.args.get('store', '')
 
     # Build store_shifts: only fetch calendar for the active store
     store_shifts = []
@@ -969,7 +969,7 @@ def shifts():
     if my_name and is_neesa_active:
         try:
             import lw_calendar_write
-            my_events = lw_calendar_write.get_my_events(my_name, dates[0], dates[-1])
+            my_events = lw_calendar_write.get_my_events_all(my_name, dates[0], dates[-1])
             my_events_json = json.dumps(my_events, ensure_ascii=False)
         except Exception as e:
             app.logger.warning('shifts自分の予定取得失敗: %s', e)

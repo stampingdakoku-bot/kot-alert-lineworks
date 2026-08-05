@@ -277,6 +277,26 @@ def get_my_events(display_name, start_date, end_date, calendar_id=None, user_id=
     return result
 
 
+def get_my_events_all(display_name, start_date, end_date):
+    """個人の予定登録用カレンダー(DEFAULT_CALENDAR_ID)に加え、@121チームのシフト実績
+    カレンダー(neesa_lw.AT121_CALENDAR_ID)も対象に本人名を含む予定をまとめて返す。
+    松田のように@121専用カレンダーでシフトが管理されているスタッフは、本人名一致の
+    シフトがDEFAULT_CALENDAR_ID側に存在しないため、get_my_events単体では見つからず
+    /shifts等の本人予定クリック編集が「見つかりませんでした」になってしまう。
+    各イベントにcalendar_idを付与し、編集・削除時にどちらのカレンダーへ書き込むか
+    呼び出し側で判別できるようにする。"""
+    merged = get_my_events(display_name, start_date, end_date)
+    for evs in merged.values():
+        for ev in evs:
+            ev['calendar_id'] = DEFAULT_CALENDAR_ID
+    at121 = get_my_events(display_name, start_date, end_date, calendar_id=neesa_lw.AT121_CALENDAR_ID)
+    for d, evs in at121.items():
+        for ev in evs:
+            ev['calendar_id'] = neesa_lw.AT121_CALENDAR_ID
+        merged.setdefault(d, []).extend(evs)
+    return merged
+
+
 def build_rrule(freq, weekdays):
     """freq: 'weekly' | 'monthly', weekdays: ['MO','TU',...] のRRULE文字列を1本組み立てる"""
     freq_code = 'WEEKLY' if freq == 'weekly' else 'MONTHLY'

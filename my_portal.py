@@ -317,15 +317,17 @@ def schedule():
         repeat_freq = request.form.get('repeat_freq') or ''
         repeat_days = request.form.getlist('repeat_days')
         month_ctx = date_str[:7] if date_str else None
+        next_url = request.form.get('next') or ''
+        fallback = next_url if next_url.startswith('/') else url_for('my.schedule', month=month_ctx)
         if not (title and date_str and start_time and end_time):
             flash('全項目を入力してください', 'error')
-            return redirect(url_for('my.schedule', month=month_ctx))
+            return redirect(fallback)
         try:
             start_dt = datetime.strptime(f'{date_str} {start_time}', '%Y-%m-%d %H:%M')
             end_dt = datetime.strptime(f'{date_str} {end_time}', '%Y-%m-%d %H:%M')
         except ValueError:
             flash('日付・時刻の形式が正しくありません', 'error')
-            return redirect(url_for('my.schedule', month=month_ctx))
+            return redirect(fallback)
         summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
         recurrence = None
         if repeat_freq in ('weekly', 'monthly') and repeat_days:
@@ -339,7 +341,7 @@ def schedule():
             flash('予定を登録しました', 'success')
         else:
             flash('予定の登録に失敗しました', 'error')
-        return redirect(url_for('my.schedule', month=month_ctx))
+        return redirect(fallback)
 
     now = datetime.now(JST)
     today_str = now.strftime('%Y-%m-%d')

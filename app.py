@@ -809,16 +809,44 @@ def shifts():
     if range_param not in ('day', 'week', 'month'):
         range_param = 'week'
     today = date.today()
-    if range_param == 'day':
-        dates = [today]
-    elif range_param == 'month':
+
+    if range_param == 'month':
+        month_param = (request.args.get('month') or '').strip()
+        try:
+            m_year, m_month = (int(x) for x in month_param.split('-')) if month_param else (today.year, today.month)
+        except ValueError:
+            m_year, m_month = today.year, today.month
         import calendar as _cal_mod
-        days_in_month = _cal_mod.monthrange(today.year, today.month)[1]
-        last_day_of_month = date(today.year, today.month, days_in_month)
-        span = (last_day_of_month - today).days + 1
-        dates = [(today + timedelta(days=i)) for i in range(span)]
+        days_in_month = _cal_mod.monthrange(m_year, m_month)[1]
+        first_of_month = date(m_year, m_month, 1)
+        last_of_month = date(m_year, m_month, days_in_month)
+        # 表示中の月が「今月」の場合のみ今日から月末まで(過去日は出さない)。
+        # 前月/翌月に移動した場合はその月をまるごと表示する。
+        range_start = today if (m_year, m_month) == (today.year, today.month) else first_of_month
+        dates = [(range_start + timedelta(days=i)) for i in range((last_of_month - range_start).days + 1)]
+        prev_month_date = first_of_month - timedelta(days=1)
+        next_month_date = last_of_month + timedelta(days=1)
+        nav_param_name = 'month'
+        prev_nav = f'{prev_month_date.year:04d}-{prev_month_date.month:02d}'
+        next_nav = f'{next_month_date.year:04d}-{next_month_date.month:02d}'
+        current_nav_value = f'{m_year:04d}-{m_month:02d}'
     else:
-        dates = [(today + timedelta(days=i)) for i in range(7)]
+        start_param = (request.args.get('start') or '').strip()
+        try:
+            anchor = date.fromisoformat(start_param) if start_param else today
+        except ValueError:
+            anchor = today
+        nav_param_name = 'start'
+        if range_param == 'day':
+            dates = [anchor]
+            step = timedelta(days=1)
+        else:  # week
+            dates = [(anchor + timedelta(days=i)) for i in range(7)]
+            step = timedelta(days=7)
+        prev_nav = (anchor - step).isoformat()
+        next_nav = (anchor + step).isoformat()
+        current_nav_value = anchor.isoformat()
+
     today_str = today.isoformat()
     end_date = dates[-1]
 
@@ -992,6 +1020,10 @@ def shifts():
                            active_store=active_store,
                            today=today_str,
                            range_param=range_param,
+                           nav_param_name=nav_param_name,
+                           prev_nav=prev_nav,
+                           next_nav=next_nav,
+                           current_nav_value=current_nav_value,
                            my_name=my_name,
                            my_events_json=my_events_json)
 

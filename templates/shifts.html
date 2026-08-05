@@ -2,11 +2,15 @@
 {% block title %}全社スタッフスケジュール一覧{% endblock %}
 {% block content %}
 
-{% set range_label = {'day': '当日のみ', 'week': '7日間', 'month': '今月末まで'}[range_param] %}
+{% set range_label = {'day': '当日のみ', 'week': '7日間', 'month': '月末まで'}[range_param] %}
+{% set nav_labels = {'day': ('前日', '翌日'), 'week': ('前週', '翌週'), 'month': ('前月', '翌月')} %}
+{% set prev_label, next_label = nav_labels[range_param] %}
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
     <h2 style="margin:0">全社スタッフスケジュール一覧</h2>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <a href="?store={{ active_store }}&range={{ range_param }}&{{ nav_param_name }}={{ prev_nav }}" class="btn" style="padding:6px 12px">◀ {{ prev_label }}</a>
+        <a href="?store={{ active_store }}&range={{ range_param }}&{{ nav_param_name }}={{ next_nav }}" class="btn" style="padding:6px 12px">{{ next_label }} ▶</a>
         <select id="deptSelect" style="min-width:200px">
             <option value="" {{ 'selected' if not active_store }}>店舗・部署を選択</option>
             <optgroup label="アソビバスターズ">
@@ -51,7 +55,7 @@
 <div class="card" style="padding:0;overflow:hidden">
     <div style="padding:16px 20px 0">
         <span style="font-weight:bold;color:var(--nm-text)">アソビバスターズ / {{ store.store_name }}</span>
-        <span style="font-size:12px;color:var(--nm-text-dim);margin-left:6px">{{ today[5:].replace('-', '/') }} から{{ range_label }}・〜{{ store.closing_hour }}:00</span>
+        <span style="font-size:12px;color:var(--nm-text-dim);margin-left:6px">{{ store.days[0].date[5:].replace('-', '/') }} から{{ range_label }}・〜{{ store.closing_hour }}:00</span>
     </div>
     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:12px">
         <table style="margin-bottom:0">
@@ -106,7 +110,7 @@
 <div class="card" style="padding:0;overflow:hidden">
     <div style="padding:16px 20px 0">
         <span style="font-weight:bold;color:var(--nm-text)">{{ group.company }} / {{ group.dept }}</span>
-        <span style="font-size:12px;color:var(--nm-text-dim);margin-left:6px">{{ today[5:].replace('-', '/') }} から{{ range_label }}</span>
+        <span style="font-size:12px;color:var(--nm-text-dim);margin-left:6px">{{ group.days[0].date[5:].replace('-', '/') }} から{{ range_label }}</span>
         {% if my_name %}
         <span style="font-size:12px;color:var(--nm-accent);margin-left:6px">※ ご自身の予定は名前をタップすると編集・削除できます</span>
         {% endif %}
@@ -153,9 +157,20 @@
                             </div>
                             {% endif %}
                             {% endfor %}
+                            {% if my_name %}
+                            <button type="button" class="nm-surface" style="display:inline-flex;align-items:center;border-radius:10px;padding:8px 10px;font-size:13px;
+                                    cursor:pointer;font-family:inherit;border:1px dashed var(--nm-text-dim);background:none;color:var(--nm-text-dim)"
+                                    onclick="openMyShiftCreateModal('{{ day.date }}')" title="この日に自分の予定を登録">＋</button>
+                            {% endif %}
                         </div>
                         {% else %}
+                        {% if my_name %}
+                        <button type="button" class="nm-surface" style="display:inline-flex;align-items:center;border-radius:10px;padding:8px 12px;font-size:13px;
+                                cursor:pointer;font-family:inherit;border:1px dashed var(--nm-text-dim);background:none;color:var(--nm-text-dim)"
+                                onclick="openMyShiftCreateModal('{{ day.date }}')">＋ 予定を登録</button>
+                        {% else %}
                         <span style="color:var(--nm-text-dim);font-size:13px">シフトなし</span>
+                        {% endif %}
                         {% endif %}
                     </td>
                 </tr>
@@ -193,8 +208,8 @@
                 ※ 繰り返し予定は時刻を変更できません。
             </p>
             <div style="margin-top:12px;display:flex;gap:8px">
-                <button type="submit" class="btn btn-success">更新する</button>
-                <button type="button" class="btn btn-danger" onclick="askDeleteMyShift()">削除する</button>
+                <button type="submit" id="myShiftSubmitBtn" class="btn btn-success">更新する</button>
+                <button type="button" id="myShiftDeleteBtn" class="btn btn-danger" onclick="askDeleteMyShift()">削除する</button>
             </div>
         </form>
     </div>
@@ -236,7 +251,9 @@ var currentMyEvent = null;
             var val = this.value; // "store:フジグラン" or "neesa:NeeSa|発送部"
             if (!val) { window.location.href = '?'; return; }
             var key = val.slice(val.indexOf(':') + 1);
-            window.location.href = '?store=' + encodeURIComponent(key) + '&range=' + document.getElementById('rangeSelect').value;
+            // 店舗/部署を切り替えても、今見ている日付・週・月はそのまま維持する
+            window.location.href = '?store=' + encodeURIComponent(key) + '&range=' + document.getElementById('rangeSelect').value
+                + '&{{ nav_param_name }}=' + encodeURIComponent('{{ current_nav_value }}');
         });
     }
     var rangeSelect = document.getElementById('rangeSelect');
@@ -267,6 +284,8 @@ function openMyShiftModal(dateIso) {
     }
     document.getElementById('myShiftEmpty').style.display = 'none';
     document.getElementById('myShiftForm').style.display = 'block';
+    document.getElementById('myShiftDeleteBtn').style.display = 'inline-flex';
+    document.getElementById('myShiftSubmitBtn').textContent = '更新する';
 
     var ev = evs[0];
     currentMyEvent = ev;
@@ -280,6 +299,31 @@ function openMyShiftModal(dateIso) {
     document.getElementById('ms_start').readOnly = ev.is_recurring;
     document.getElementById('ms_end').readOnly = ev.is_recurring;
     document.getElementById('ms_recurringNote').style.display = ev.is_recurring ? 'block' : 'none';
+
+    document.getElementById('myShiftModalBg').style.display = 'block';
+}
+
+function openMyShiftCreateModal(dateIso) {
+    var d = new Date(dateIso + 'T00:00:00');
+    var w = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+    document.getElementById('myShiftModalTitle').textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日(' + w + ')の予定を登録';
+
+    currentMyEvent = null;
+    document.getElementById('myShiftEmpty').style.display = 'none';
+    document.getElementById('myShiftForm').style.display = 'block';
+    document.getElementById('myShiftDeleteBtn').style.display = 'none';
+    document.getElementById('myShiftSubmitBtn').textContent = '登録する';
+
+    document.getElementById('myShiftForm').action = '{{ url_for("my.schedule") }}';
+    document.getElementById('ms_date').value = dateIso;
+    document.getElementById('ms_title').value = '';
+    document.getElementById('ms_start').value = '';
+    document.getElementById('ms_end').value = '';
+    document.getElementById('ms_recurrence').value = '[]';
+    document.getElementById('ms_calendar_id').value = '';
+    document.getElementById('ms_start').readOnly = false;
+    document.getElementById('ms_end').readOnly = false;
+    document.getElementById('ms_recurringNote').style.display = 'none';
 
     document.getElementById('myShiftModalBg').style.display = 'block';
 }

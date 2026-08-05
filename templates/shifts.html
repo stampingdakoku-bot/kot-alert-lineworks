@@ -202,8 +202,17 @@
             <input type="hidden" name="calendar_id" id="ms_calendar_id">
             <input type="hidden" name="next" value="/shifts?store={{ active_store }}&range={{ range_param }}">
             <div class="form-row"><label>内容</label><input type="text" name="title" id="ms_title" required style="flex:1"></div>
-            <div class="form-row"><label>開始時刻</label><input type="time" name="start_time" id="ms_start" required></div>
-            <div class="form-row"><label>終了時刻</label><input type="time" name="end_time" id="ms_end" required></div>
+            <div class="form-row">
+                <label>終日</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;min-height:auto">
+                    <input type="checkbox" id="ms_allday" name="all_day" value="1" style="min-height:auto;width:18px;height:18px" onchange="toggleMsAllDay()">
+                    終日の予定にする
+                </label>
+            </div>
+            <div id="ms_timeRows">
+                <div class="form-row"><label>開始時刻</label><input type="time" name="start_time" id="ms_start" required></div>
+                <div class="form-row"><label>終了時刻</label><input type="time" name="end_time" id="ms_end" required></div>
+            </div>
             <p id="ms_recurringNote" style="display:none;color:var(--nm-text-dim);font-size:12px;margin-bottom:8px">
                 ※ 繰り返し予定は時刻を変更できません。
             </p>
@@ -299,8 +308,17 @@ function openMyShiftModal(dateIso) {
     document.getElementById('ms_start').readOnly = ev.is_recurring;
     document.getElementById('ms_end').readOnly = ev.is_recurring;
     document.getElementById('ms_recurringNote').style.display = ev.is_recurring ? 'block' : 'none';
+    document.getElementById('ms_allday').checked = (ev.start_time === '00:00' && ev.end_time === '23:59');
+    toggleMsAllDay();
 
     document.getElementById('myShiftModalBg').style.display = 'block';
+}
+
+function toggleMsAllDay() {
+    var checked = document.getElementById('ms_allday').checked;
+    document.getElementById('ms_timeRows').style.display = checked ? 'none' : '';
+    document.getElementById('ms_start').required = !checked;
+    document.getElementById('ms_end').required = !checked;
 }
 
 function openMyShiftCreateModal(dateIso) {
@@ -324,6 +342,8 @@ function openMyShiftCreateModal(dateIso) {
     document.getElementById('ms_start').readOnly = false;
     document.getElementById('ms_end').readOnly = false;
     document.getElementById('ms_recurringNote').style.display = 'none';
+    document.getElementById('ms_allday').checked = false;
+    toggleMsAllDay();
 
     document.getElementById('myShiftModalBg').style.display = 'block';
 }

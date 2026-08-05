@@ -502,13 +502,16 @@ def _group_shifts_for_day(normal_with_group, at121_comps, target_date):
             parsed["force_group"] = force_group
         seen.setdefault(parsed["name"], parsed)
 
-    # 時間レンジ形式に一致しない「名前+メモ」形式(休み・中抜け・早退等)を、
-    # 該当日に実シフトが無い名前に限りそのままの文言で拾う(2026-08-05)
+    # 時間レンジ形式に一致しない「名前+メモ」形式(休み・中抜け・早退、personal予定登録の
+    # 終日予定等)を、該当日に実シフトが無い名前に限りそのままの文言で拾う(2026-08-05)。
+    # AT121_ONLY_NAMESは「9-18松田」のような旧ローテーション時間シフトのみを対象とした
+    # 除外なので、ここ(名前+メモ形式)には適用しない。適用すると松田本人が/my/scheduleや
+    # /shiftsから登録した個人予定まで一覧から消えてしまう。
     for c, force_group in normal_with_group:
         note = parse_shift_note(c.get("summary", ""))
         if not note or note["name"] in seen:
             continue
-        if note["name"] in EXCLUDE_NAMES or note["name"] in AT121_ONLY_NAMES:
+        if note["name"] in EXCLUDE_NAMES:
             continue
         if not _applies_on_note(c, target_date):
             continue

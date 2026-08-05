@@ -320,8 +320,11 @@ def schedule():
     if request.method == 'POST':
         title = (request.form.get('title') or '').strip()
         date_str = request.form.get('date')
+        all_day = request.form.get('all_day') == '1'
         start_time = request.form.get('start_time')
         end_time = request.form.get('end_time')
+        if all_day:
+            start_time, end_time = '00:00', '23:59'
         repeat_freq = request.form.get('repeat_freq') or ''
         repeat_days = request.form.getlist('repeat_days')
         month_ctx = date_str[:7] if date_str else None
@@ -336,7 +339,10 @@ def schedule():
         except ValueError:
             flash('日付・時刻の形式が正しくありません', 'error')
             return redirect(fallback)
-        summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
+        if all_day:
+            summary = f'{staff["display_name"]} {title}'.strip()
+        else:
+            summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
         recurrence = None
         if repeat_freq in ('weekly', 'monthly') and repeat_days:
             recurrence = [lw_calendar_write.build_rrule(repeat_freq, repeat_days)]
@@ -411,8 +417,11 @@ def schedule_edit(event_id):
     staff = _get_staff(session['staff_id'])
     title = (request.form.get('title') or '').strip()
     date_str = request.form.get('date')
+    all_day = request.form.get('all_day') == '1'
     start_time = request.form.get('start_time')
     end_time = request.form.get('end_time')
+    if all_day:
+        start_time, end_time = '00:00', '23:59'
     recurrence_json = request.form.get('recurrence') or '[]'
     calendar_id = request.form.get('calendar_id') or None
     month_ctx = date_str[:7] if date_str else None
@@ -437,7 +446,10 @@ def schedule_edit(event_id):
         # 新しい開始時刻に合わせて付け替える(でないと削除済みのoccurrenceが復活する)
         recurrence = lw_calendar_write.remap_exdate_times(recurrence, start_dt.time())
 
-    summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
+    if all_day:
+        summary = f'{staff["display_name"]} {title}'.strip()
+    else:
+        summary = f'{start_time}-{end_time}{staff["display_name"]} {title}'.strip()
     attendees = _build_attendees(staff, request.form.get('attendees'))
     reminders = _build_reminders(request.form.get('reminders'))
     ok, detail = lw_calendar_write.update_event(

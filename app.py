@@ -758,8 +758,20 @@ def shifts():
     token = lw_api.get_access_token()
     headers = {"Authorization": "Bearer " + token} if token else {}
 
+    range_param = request.args.get('range', 'week')
+    if range_param not in ('day', 'week', 'month'):
+        range_param = 'week'
     today = date.today()
-    dates = [(today + timedelta(days=i)) for i in range(7)]
+    if range_param == 'day':
+        dates = [today]
+    elif range_param == 'month':
+        import calendar as _cal_mod
+        days_in_month = _cal_mod.monthrange(today.year, today.month)[1]
+        last_day_of_month = date(today.year, today.month, days_in_month)
+        span = (last_day_of_month - today).days + 1
+        dates = [(today + timedelta(days=i)) for i in range(span)]
+    else:
+        dates = [(today + timedelta(days=i)) for i in range(7)]
     today_str = today.isoformat()
     end_date = dates[-1]
 
@@ -908,12 +920,28 @@ def shifts():
             neesa_companies.append({'company': entry['company'], 'groups': []})
         neesa_companies[-1]['groups'].append(entry)
 
+    # ログイン中の本人がNeeSaテナントの場合のみ、自分の予定を編集・削除できるようにする
+    # (トレコレ店舗側は別のカレンダー基盤で書き込みAPIが未整備のため対象外)
+    import json
+    my_name = session.get('staff_name') or ''
+    my_events_json = '{}'
+    if my_name and is_neesa_active:
+        try:
+            import lw_calendar_write
+            my_events = lw_calendar_write.get_my_events(my_name, dates[0], dates[-1])
+            my_events_json = json.dumps(my_events, ensure_ascii=False)
+        except Exception as e:
+            app.logger.warning('shifts自分の予定取得失敗: %s', e)
+
     return render_template('shifts.html',
                            store_shifts=store_shifts,
                            neesa_shifts=neesa_shifts,
                            neesa_companies=neesa_companies,
                            active_store=active_store,
-                           today=today_str)
+                           today=today_str,
+                           range_param=range_param,
+                           my_name=my_name,
+                           my_events_json=my_events_json)
 
 
 # --- Stores ---

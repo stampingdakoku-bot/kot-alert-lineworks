@@ -403,16 +403,18 @@ def schedule_edit(event_id):
     end_time = request.form.get('end_time')
     recurrence_json = request.form.get('recurrence') or '[]'
     month_ctx = date_str[:7] if date_str else None
+    next_url = request.form.get('next') or ''
+    fallback = next_url if next_url.startswith('/') else url_for('my.schedule', month=month_ctx)
 
     if not (title and date_str and start_time and end_time):
         flash('全項目を入力してください', 'error')
-        return redirect(url_for('my.schedule', month=month_ctx))
+        return redirect(fallback)
     try:
         start_dt = datetime.strptime(f'{date_str} {start_time}', '%Y-%m-%d %H:%M')
         end_dt = datetime.strptime(f'{date_str} {end_time}', '%Y-%m-%d %H:%M')
     except ValueError:
         flash('日付・時刻の形式が正しくありません', 'error')
-        return redirect(url_for('my.schedule', month=month_ctx))
+        return redirect(fallback)
     try:
         recurrence = json.loads(recurrence_json)
     except (ValueError, TypeError):
@@ -432,7 +434,7 @@ def schedule_edit(event_id):
         flash('予定を更新しました', 'success')
     else:
         flash('予定の更新に失敗しました', 'error')
-    return redirect(url_for('my.schedule', month=month_ctx))
+    return redirect(fallback)
 
 
 @my_bp.route('/schedule/event/<event_id>/delete', methods=['POST'])
@@ -445,6 +447,8 @@ def schedule_delete(event_id):
     summary = request.form.get('summary') or ''
     recurrence_json = request.form.get('recurrence') or '[]'
     month_ctx = (occurrence_date_str or series_start_str)[:7] or None
+    next_url = request.form.get('next') or ''
+    fallback = next_url if next_url.startswith('/') else url_for('my.schedule', month=month_ctx)
 
     try:
         recurrence = json.loads(recurrence_json)
@@ -460,7 +464,7 @@ def schedule_delete(event_id):
             occ_date = date.fromisoformat(occurrence_date_str)
         except (ValueError, TypeError):
             flash('削除処理に失敗しました', 'error')
-            return redirect(url_for('my.schedule', month=month_ctx))
+            return redirect(fallback)
 
         if mode == 'single':
             occ_dt = datetime.combine(occ_date, series_start.time())
@@ -474,7 +478,7 @@ def schedule_delete(event_id):
         flash('予定を削除しました', 'success')
     else:
         flash('予定の削除に失敗しました', 'error')
-    return redirect(url_for('my.schedule', month=month_ctx))
+    return redirect(fallback)
 
 
 @my_bp.route('/notify', methods=['GET', 'POST'])

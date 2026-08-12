@@ -23,6 +23,7 @@ import os
 import re
 import logging
 from datetime import datetime, timezone, timedelta
+from dateutil import rrule as _rrule
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -144,49 +145,97 @@ def has_request_for_today(employee_key, timerecord_requests):
     return False
 
 
+def _event_occurs_today(comp, today_date):
+    """イベントコンポーネントが today_date に実際に発生するか判定する。
+    繰り返し(RRULE)はEXDATEを考慮して展開し、単発/修正インスタンスは開始日一致で判定。
+    他日の修正インスタンスやEXDATE除外日を「今日のシフト」に混入させないためのフィルタ。"""
+    sdt = (comp.get("start", {}) or {}).get("dateTime")
+    if not sdt:
+        return False
+    try:
+        dtstart = datetime.fromisoformat(sdt).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return False
+    rec = comp.get("recurrence")
+    if not rec:
+        return dtstart.date() == today_date
+    rset = _rrule.rruleset()
+    has_rule = False
+    for line in rec:
+        if line.startswith("RRULE:"):
+            try:
+                # naive基準で扱うため UNTIL の Z(UTC) を除去
+                rset.rrule(_rrule.rrulestr(line[6:].replace("Z", ""), dtstart=dtstart))
+                has_rule = True
+            except (ValueError, TypeError):
+                pass
+        elif line.startswith("EXDATE"):
+            val = line.split(":", 1)[-1]
+            for d in val.split(","):
+                try:
+                    rset.exdate(datetime.strptime(d.strip().replace("Z", ""), "%Y%m%dT%H%M%S"))
+                except ValueError:
+                    pass
+    if not has_rule:
+        return dtstart.date() == today_date
+    day0 = datetime(today_date.year, today_date.month, today_date.day)
+    for occ in rset.between(day0, day0 + timedelta(days=1), inc=True):
+        if occ.date() == today_date:
+            return True
+    return False
+
+
 def parse_shift_events(events, now, name_map, mappings):
-    """カレンダーイベントをパースしてシフト情報リストを返す"""
+    """カレンダーイベントをパースしてシフト情報リストを返す。
+    繰り返しイベントはマスタと修正インスタンスが同一eventの複数componentに入るため、
+    先頭componentだけでなく全componentを走査し、当日に実際に発生するものだけ採用する。"""
     shifts = []
+    seen = set()  # (emp_key, shift_start, shift_end) で重複排除
     for event in events:
-        components = event.get("eventComponents", [])
-        if not components:
-            continue
-        comp = components[0]
-        summary = comp.get("summary", "")
-        shift_name = parse_shift_name(summary)
-        if not shift_name:
-            continue
+        for comp in event.get("eventComponents", []):
+            summary = comp.get("summary", "")
+            shift_name = parse_shift_name(summary)
+            if not shift_name:
+                continue
 
-        start_info = comp.get("start", {})
-        start_dt_str = start_info.get("dateTime", "")
-        end_info = comp.get("end", {})
-        end_dt_str = end_info.get("dateTime", "")
-        if not start_dt_str or not end_dt_str:
-            continue
+            start_info = comp.get("start", {})
+            start_dt_str = start_info.get("dateTime", "")
+            end_info = comp.get("end", {})
+            end_dt_str = end_info.get("dateTime", "")
+            if not start_dt_str or not end_dt_str:
+                continue
 
-        start_parsed = datetime.fromisoformat(start_dt_str)
-        shift_start = now.replace(hour=start_parsed.hour, minute=start_parsed.minute, second=0, microsecond=0)
-        end_parsed = datetime.fromisoformat(end_dt_str)
-        shift_end = now.replace(hour=end_parsed.hour, minute=end_parsed.minute, second=0, microsecond=0)
+            # 当日に実際に発生するシフトのみ採用（他日の修正インスタンス・EXDATE除外日を弾く）
+            if not _event_occurs_today(comp, now.date()):
+                continue
 
-        emp_info = name_map.get(shift_name)
-        if not emp_info:
-            continue
+            emp_info = name_map.get(shift_name)
+            if not emp_info:
+                continue
+            emp_key = emp_info["employee_key"]
+            lw_id = mappings.get(emp_key)
+            if not lw_id:
+                continue
 
-        emp_key = emp_info["employee_key"]
-        lw_id = mappings.get(emp_key)
-        if not lw_id:
-            continue
+            start_parsed = datetime.fromisoformat(start_dt_str)
+            shift_start = now.replace(hour=start_parsed.hour, minute=start_parsed.minute, second=0, microsecond=0)
+            end_parsed = datetime.fromisoformat(end_dt_str)
+            shift_end = now.replace(hour=end_parsed.hour, minute=end_parsed.minute, second=0, microsecond=0)
 
-        shifts.append({
-            "shift_name": shift_name,
-            "shift_start": shift_start,
-            "shift_end": shift_end,
-            "emp_key": emp_key,
-            "emp_code": emp_info.get("employee_code", ""),
-            "emp_name": emp_info.get("last_name", "") + " " + emp_info.get("first_name", ""),
-            "lw_id": lw_id,
-        })
+            dedup_key = (emp_key, shift_start, shift_end)
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+
+            shifts.append({
+                "shift_name": shift_name,
+                "shift_start": shift_start,
+                "shift_end": shift_end,
+                "emp_key": emp_key,
+                "emp_code": emp_info.get("employee_code", ""),
+                "emp_name": emp_info.get("last_name", "") + " " + emp_info.get("first_name", ""),
+                "lw_id": lw_id,
+            })
     return shifts
 
 

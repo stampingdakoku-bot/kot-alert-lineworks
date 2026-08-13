@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, date, timezone, timedelta
+from dateutil import rrule as _rrule
 from concurrent.futures import ThreadPoolExecutor
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from dotenv import load_dotenv
@@ -134,6 +135,43 @@ def check_auth():
     #     return redirect(url_for('login'))
 
 
+def _shift_occurs_today(comp, today_date):
+    """カレンダーのイベントコンポーネントが today_date に実際に発生するか判定。
+    繰り返し(RRULE)はEXDATEを考慮して展開、単発/修正インスタンスは開始日一致で判定。
+    他日の修正インスタンスやEXDATE除外日を「今日のシフト」に混入させないためのフィルタ
+    （checker.py の同名ロジックと同等）。"""
+    sdt = (comp.get("start", {}) or {}).get("dateTime")
+    if not sdt:
+        return False
+    try:
+        dtstart = datetime.fromisoformat(sdt).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return False
+    rec = comp.get("recurrence")
+    if not rec:
+        return dtstart.date() == today_date
+    rset = _rrule.rruleset()
+    has_rule = False
+    for line in rec:
+        if line.startswith("RRULE:"):
+            try:
+                rset.rrule(_rrule.rrulestr(line[6:].replace("Z", ""), dtstart=dtstart))
+                has_rule = True
+            except (ValueError, TypeError):
+                pass
+        elif line.startswith("EXDATE"):
+            for d in line.split(":", 1)[-1].split(","):
+                try:
+                    rset.exdate(datetime.strptime(d.strip().replace("Z", ""), "%Y%m%dT%H%M%S"))
+                except ValueError:
+                    pass
+    if not has_rule:
+        return dtstart.date() == today_date
+    day0 = datetime(today_date.year, today_date.month, today_date.day)
+    return any(o.date() == today_date
+               for o in rset.between(day0, day0 + timedelta(days=1), inc=True))
+
+
 def _get_store_shifts_and_attendance(today_str):
     """店舗ごとのシフト情報と出退勤状況を取得"""
     import re
@@ -237,11 +275,21 @@ def _get_store_shifts_and_attendance(today_str):
             card['calendar_error'] = True
 
         # Parse shift names from events
+        # 繰り返し(RRULE/EXDATE)・修正インスタンスを当日判定し、実際に今日発生する
+        # componentだけを対象にする（他日ゴースト混入・先頭component以外のマスタ取り逃しを防ぐ）
+        _today_date = date.fromisoformat(today_str)
+        _occurring = []
+        _seen_comp = set()
         for event in events:
-            components = event.get("eventComponents", [])
-            if not components:
-                continue
-            comp = components[0]
+            for c in event.get("eventComponents", []):
+                if not _shift_occurs_today(c, _today_date):
+                    continue
+                k = (c.get("summary", ""), (c.get("start", {}) or {}).get("dateTime", ""))
+                if k in _seen_comp:
+                    continue
+                _seen_comp.add(k)
+                _occurring.append(c)
+        for comp in _occurring:
             summary = comp.get("summary", "")
 
             # Parse name from summary like "13-22 内田" / "11:00-21:00 内田"

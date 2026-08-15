@@ -423,7 +423,8 @@ def main():
                 diff_minutes = int((tr["clock_out"] - shift_end).total_seconds() / 60)
                 clock_out_str = tr["clock_out"].strftime("%H:%M")
 
-                if diff_minutes > 1 and not has_request_for_today(emp_key, tr_requests):
+                # 5分の猶予: レジ開け等で終了+5分までは超過扱いにしない（+6分から発報）
+                if diff_minutes > 5 and not has_request_for_today(emp_key, tr_requests):
                     if settings.get('deviation_enabled', True) and not db.was_alert_sent(emp_key, "deviation", today_str):
                         tmpl = alert_templates.get('deviation',
                             '📋 勤務時間のお知らせ\nシフト終了: {shift_end}\n退勤打刻: {clock_out}（{diff}分超過）\n修正申請がまだ提出されていません。\nお早めに申請をお願いします。')
